@@ -1,0 +1,34 @@
+input_path=/home/gezi/data/image-caption/keyword
+dir=/home/gezi/temp/image-caption/keyword/seq-with-unk.basic
+
+hdfs_dir=/app/tuku/chenghuige/image-caption/seq-with-unk.basic
+
+train_data_path=$input_path/train/
+valid_data_path=$input_path/test
+
+
+train_output_path=$dir/train
+valid_output_path=$dir/valid
+fixed_valid_output_path=$dir/fixed_valid
+
+hdfs_train_output_path=$hdfs_dir/train
+
+resource_dir=/home/gezi/exp/tieba/urate/
+
+vocab_size=500000
+
+seg_method=basic_single
+online_seg_method=basic
+feed_single=1
+
+#now set 0 to be same as bow for comparing, but its is better to set to 1 TODO
+shuffle_texts=0
+
+
+#-----common
+#export CUDA_HOME=/home/gezi/soft/cuda-7.5
+#export PATH=$CUDA_HOME/bin:$PATH
+#export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
+#export PYTHONPATH=/home/gezi/mine/tensorflow-exp/:/home/gezi/mine/tensorflow-exp/util/:/home/gezi/python:$PYTHONPATH
+#export LD_LIBRARY_PATH=/home/gezi/python:/home/gezi/python/lib:$LD_LIBRARY_PATH 
+#

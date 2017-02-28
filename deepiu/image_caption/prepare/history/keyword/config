@@ -1,0 +1,14 @@
+input_path=/home/gezi/data/image-text-sim/ 
+#dir=/home/gezi/temp/image-caption/keyword
+dir=/tmp/image-caption/keyword
+
+train_data_path=$input_path/train/
+valid_data_path=$input_path/test
+
+train_output_path=$dir/train
+valid_output_path=$dir/valid
+fixed_valid_output_path=$dir/fixed_valid
+
+resource_dir=/home/gezi/exp/tieba/urate/
+
+vocab_size=500000

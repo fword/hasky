@@ -1,0 +1,14 @@
+input_path=/home/gezi/data/image-auto-comment/
+#dir=/home/gezi/temp/image-caption/comment
+dir=/tmp/image-caption/comment
+
+train_data_path=$input_path/train/
+valid_data_path=$input_path/test
+
+train_output_path=$dir/train
+valid_output_path=$dir/valid
+fixed_valid_output_path=$dir/fixed_valid
+
+resource_dir=/home/gezi/exp/tieba/urate/
+
+seg_method='phrase_single'

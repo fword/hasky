@@ -1,0 +1,1 @@
+../../../util/melt/tools/delete-old-models.py
