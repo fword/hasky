@@ -17,14 +17,14 @@ sh run.sh
 
 
 Sparse regression training
-1. gen tfrecord
-cd ./tf-record/sparse 
-sh run.sh
+1. gen tfrecord  
+cd ./tf-record/sparse   
+sh run.sh  
 #Notice we use E2006-tfidf datast for regression example which has 150360 features 
 #https://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/regression.html
 #https://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/regression/E2006.train.bz2
 #https://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/regression/E2006.test.bz2
 
-2. train and validate
-cd ./text-regression
-sh run.sh
+2. train and validate  
+cd ./text-regression  
+sh run.sh  
