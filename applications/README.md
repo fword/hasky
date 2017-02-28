@@ -27,4 +27,6 @@ sh run.sh
 
 2. train and validate  
 cd ./text-regression  
-sh run.sh  
+sh run.sh    
+predict  using:
+sh predict.sh  
