@@ -1,4 +1,5 @@
-tensorflow related work
+tensorflow/pytorch related work(nlp and image related, text classification, image caption, seq2seq..)   
+
 ## incase not find dependence, make sure set PYTHONPATH to include tensorflow_exp/util so we can find gezi and melt
 ##./examples/ 
 ./examples/tf-record/  
@@ -27,7 +28,8 @@ Input with both image and text(TODO)
 app with long text as input(like image title, ct0) and predict shortter summary text(like click query)  
 supporting method:  
 seq2seq
-seq2seq_attetion(TODO)  
+seq2seq_attetion   
+seq2seq_attetion_copy(TODO)  
 ###./deepiu/seq2seq 
 common seq2seq codes used for image-caption, text-sum and other applications
 ###./deepiu/util
@@ -46,4 +48,5 @@ flow will do model save, log save(auto add all one dimentional shape tensors to 
 ## publish lib
 1. gezi ./util/gezi 
 2. melt ./util/melt
-3. deepiu ./deepiu
+3. hasky ./util/hasky  
+4. deepiu ./deepiu  
