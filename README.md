@@ -27,9 +27,9 @@ Input with both image and text(TODO)
 ###./deepiu/text-sum
 app with long text as input(like image title, ct0) and predict shortter summary text(like click query)  
 supporting method:  
-seq2seq
-seq2seq_attetion   
-seq2seq_attetion_copy(TODO)  
+seq2seq  
+seq2seq_attetion     
+seq2seq_attetion_copy(TODO)    
 ###./deepiu/seq2seq 
 common seq2seq codes used for image-caption, text-sum and other applications
 ###./deepiu/util
