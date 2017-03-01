@@ -42,7 +42,7 @@ from melt.flow import tf_flow
 def read_records():
   # Tell TensorFlow that the model will be built into the default Graph.
   inputs = melt.read_sparse.inputs
-  label_type = tf.int32 if FLAGS.label_type == 'int' else tf.float32
+  label_type = tf.int64 if FLAGS.label_type == 'int' else tf.float32
   decode = functools.partial(melt.libsvm_decode.decode, label_type=label_type)
 
   with tf.Graph().as_default():
@@ -54,7 +54,6 @@ def read_records():
       num_preprocess_threads=FLAGS.num_preprocess_threads,
       batch_join=FLAGS.batch_join,
       shuffle=FLAGS.shuffle)
-    
     tf_flow(lambda sess, step: read_once(sess, step, [X, y]))
     
 

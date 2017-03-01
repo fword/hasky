@@ -38,6 +38,7 @@ flags.DEFINE_boolean('shuffle_batch', True, '')
 #flags.DEFINE_boolean('shuffle', True, '')
 
 flags.DEFINE_string('input', '/home/gezi/temp/textsum/tfrecord/seq-basic.10w/train/train_*', '')
+flags.DEFINE_string('valid_input', '/home/gezi/temp/textsum/tfrecord/seq-basic.10w/valid/test_*', '')
 flags.DEFINE_string('name', 'train', 'records name')
 #flags.DEFINE_boolean('dynamic_batch_length', True, '')
 #flags.DEFINE_boolean('shuffle_then_decode', True, '')
@@ -88,6 +89,9 @@ def train_once_(sess, step, input_text, text, model, optimizer):
   #print('loss', total_loss)
   total_loss.backward()
   optimizer.step()
+  #NOTICE! must be .data[0] other wise will consume more and more gpu mem, see 
+  #https://discuss.pytorch.org/t/cuda-memory-continuously-increases-when-net-images-called-in-every-iteration/501
+  #https://discuss.pytorch.org/t/understanding-graphs-and-state/224/1
   train_once_.train_loss += total_loss.data[0]
 
   steps = 10

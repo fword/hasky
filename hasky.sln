@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 2013
 VisualStudioVersion = 12.0.31101.0
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "tensorflow-exp", "tensorflow-exp.pyproj", "{04956EB5-3FE3-484A-9F3F-4FC595024012}"
+Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "hasky", "hasky.pyproj", "{04956EB5-3FE3-484A-9F3F-4FC595024012}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

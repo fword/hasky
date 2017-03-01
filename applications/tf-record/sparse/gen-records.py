@@ -21,6 +21,7 @@ flags = tf.app.flags
 FLAGS = flags.FLAGS 
 
 flags.DEFINE_string('label_type', 'int', '')
+flags.DEFINE_bool('neg2zero', False, '')
 
 import numpy as np
 
@@ -36,11 +37,22 @@ def main(argv):
     l = line.rstrip().split()
 
     label = int(l[0]) if FLAGS.label_type == 'int' else float(l[0])
+
+    if FLAGS.neg2zero:
+      if label < 0:
+        if FLAGS.label_type == 'int':
+          label = 0
+        else:
+          label = 0.
     
     #input can be libsmv or tlc format, for tlc format it contatins one col of num_features here will ignore
     start = 1
-    if ':' not in l[1]:
-      start += 1
+    try:
+      if ':' not in l[1]:
+        start += 1
+    except Exception:
+      print(line)
+      continue
     
     indexes = []
     values = []
