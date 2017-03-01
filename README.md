@@ -10,7 +10,7 @@ reading libsvm format then do text classification
 reading libsvm format then do text regression  
 ###./applications/text-binary-classification  
 reading libsvm format then do text binary classification, evaluate by auc  
-###./applications/sparse-tensor-classification/  
+###./applications/sparse-tensor-classification/ (depreciated)  
 this is self contained mlp classification example showing   
 how to read sparse TFRecord and train a mlp classifier 
 
