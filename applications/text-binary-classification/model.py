@@ -49,12 +49,9 @@ def build_graph(X, y, scope='mlp_regression_model'):
     #                                                                     labels=y))
     loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=py_x, labels=tf.expand_dims(tf.to_float(y), 1)))
 
-    #---choose evaluation metrics
-    #correct_prediction = tf.equal(tf.cast(py_x, tf.int32), tf.cast(y, tf.int32))
-    #accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
-
-    #return loss, accuracy
-    return loss, loss
+ 
+    _, auc = tf.contrib.metrics.streaming_auc(tf.sigmoid(py_x), tf.expand_dims(tf.cast(y, tf.bool), 1))
+    return loss, auc
 
 
 class Predictor(object):

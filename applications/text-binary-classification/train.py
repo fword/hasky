@@ -62,7 +62,7 @@ def train():
     eval_X, eval_y = inputs(
       validset, 
       decode=decode,
-      batch_size=FLAGS.batch_size * 10,
+      batch_size=FLAGS.batch_size * 100,
       num_threads=FLAGS.num_preprocess_threads,
       batch_join=FLAGS.batch_join,
       shuffle=FLAGS.shuffle)
