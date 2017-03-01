@@ -2,15 +2,15 @@ tensorflow/pytorch related work(nlp and image related, text classification, imag
 
 ## incase not find dependence, make sure set PYTHONPATH to include tensorflow_exp/util so we can find gezi and melt
 ##./applications/ 
-./applications/tf-record/  
+###./applications/tf-record/  
 show how to write and read TFRecord(tensorflow standard dataa format)   
-./applications/text-classification  
+###./applications/text-classification  
 reading libsvm format then do text classification    
-./applications/text-regression
+###./applications/text-regression
 reading libsvm format then do text regression  
-./applications/text-binary-classification  
+###./applications/text-binary-classification  
 reading libsvm format then do text binary classification, evaluate by auc  
-./applications/sparse-tensor-classification/  
+###./applications/sparse-tensor-classification/  
 this is self contained mlp classification example showing   
 how to read sparse TFRecord and train a mlp classifier 
 
