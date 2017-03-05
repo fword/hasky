@@ -38,7 +38,6 @@ flags.DEFINE_boolean('shuffle_batch', True, '')
 #flags.DEFINE_boolean('shuffle', True, '')
 
 flags.DEFINE_string('input', '/home/gezi/temp/textsum/tfrecord/seq-basic.10w/train/train_*', '')
-flags.DEFINE_string('valid_input', '/home/gezi/temp/textsum/tfrecord/seq-basic.10w/valid/test_*', '')
 flags.DEFINE_string('name', 'train', 'records name')
 #flags.DEFINE_boolean('dynamic_batch_length', True, '')
 #flags.DEFINE_boolean('shuffle_then_decode', True, '')
@@ -61,29 +60,26 @@ def read_once(sess, step, ops):
   return input_text, text
 
 
-def train_once_(sess, step, input_text, text, model, optimizer):
-  if not hasattr(train_once_, 'train_loss'):
-    train_once_.train_loss = 0.
+def train_once(sess, step, input_text, text, model, optimizer):
+  if not hasattr(train_once, 'train_loss'):
+    train_once.train_loss = 0.
 
-  if not hasattr(train_once_, 'summary_writter'):
+  if not hasattr(train_once, 'summary_writter'):
     log_dir = '/home/gezi/temp/textsum_pytorch'
-    train_once_.summary_writer = tf.summary.FileWriter(log_dir, sess.graph)
+    train_once.summary_writer = tf.summary.FileWriter(log_dir, sess.graph)
 
   summary = tf.Summary()
 
   pred = model(input_text, text, feed_previous=False)
   
-  total_loss = None
+  total_loss = 0.
   time_steps = text.size()[1]
   batch_size = len(text)
   for time_step in xrange(time_steps - 1):
     y_pred = pred[time_step]
     target = text[:, time_step + 1]
     loss = criterion(y_pred, target)
-    if total_loss is None:
-      total_loss = loss
-    else:
-      total_loss += loss 
+    total_loss += loss 
   optimizer.zero_grad()
   total_loss /= batch_size
   #print('loss', total_loss)
@@ -92,28 +88,48 @@ def train_once_(sess, step, input_text, text, model, optimizer):
   #NOTICE! must be .data[0] other wise will consume more and more gpu mem, see 
   #https://discuss.pytorch.org/t/cuda-memory-continuously-increases-when-net-images-called-in-every-iteration/501
   #https://discuss.pytorch.org/t/understanding-graphs-and-state/224/1
-  train_once_.train_loss += total_loss.data[0]
+  train_once.train_loss += total_loss.data[0]
 
-  steps = 10
+  steps = FLAGS.interval_steps
   if step % steps == 0:
-    avg_loss = train_once_.train_loss if step is 0 else train_once_.train_loss / steps
+    avg_loss = train_once.train_loss if step is 0 else train_once.train_loss / steps
     print('step:', step, 'train_loss:', avg_loss)
-    train_once_.train_loss = 0.
+    train_once.train_loss = 0.
     
     names = melt.adjust_names([avg_loss], None)
     melt.add_summarys(summary, [avg_loss], names, suffix='train_avg%dsteps'%steps) 
-    train_once_.summary_writer.add_summary(summary, step)
-    train_once_.summary_writer.flush()
+    train_once.summary_writer.add_summary(summary, step)
+    train_once.summary_writer.flush()
 
+def eval_once(sess, step, input_text, text, model):
+  pred = model(input_text, text, feed_previous=False)
+  
+  time_steps = text.size()[1]
+  batch_size = len(text)
+  total_loss = 0.
+  for time_step in xrange(time_steps - 1):
+    y_pred = pred[time_step]
+    target = text[:, time_step + 1]
+    loss = criterion(y_pred, target) 
+    total_loss += loss
 
-def train_once(sess, step, ops, model, optimizer):
+  total_loss /= batch_size 
+  print('step:', step, 'eval_loss', total_loss.data[0])
+
+def process_once(sess, step, ops, eval_ops, model, optimizer):
   input_text, text = read_once(sess, step, ops)
-  train_once_(sess, step, input_text, text, model, optimizer)
+  train_once(sess, step, input_text, text, model, optimizer)
 
+  if eval_ops is not None:
+    if step % FLAGS.eval_interval_steps == 0:
+      eval_input_text, eval_text = read_once(sess, step, eval_ops)
+      eval_once(sess, step, eval_input_text, eval_text, model)
 
 from melt.flow import tf_flow
 import input
-def read_records():
+import functools
+
+def train():
   global vocab_size
   vocabulary.init()
   vocab_size = vocabulary.get_vocab_size() 
@@ -130,31 +146,31 @@ def read_records():
   optimizer = optim.Adagrad(model.parameters(), lr=FLAGS.learning_rate)
 
   inputs, decode = input.get_decodes(FLAGS.shuffle_then_decode, FLAGS.dynamic_batch_length)
+  inputs = functools.partial(inputs,   
+                             decode=decode,
+                             num_epochs=FLAGS.num_epochs, 
+                             num_threads=FLAGS.num_threads,
+                             batch_join=FLAGS.batch_join,
+                             shuffle_batch=FLAGS.shuffle_batch,
+                             shuffle=FLAGS.shuffle,
+                             allow_smaller_final_batch=True,
+                             )
 
-  ops = inputs(
-    FLAGS.input,
-    decode=decode,
-    batch_size=FLAGS.batch_size,
-    num_epochs=FLAGS.num_epochs, 
-    num_threads=FLAGS.num_threads,
-    #num_threads=1,
-    batch_join=FLAGS.batch_join,
-    shuffle_batch=FLAGS.shuffle_batch,
-    shuffle=FLAGS.shuffle,
-    #fix_random=True,
-    #fix_sequence=True,
-    #no_random=True,
-    allow_smaller_final_batch=True,
-    )
+  ops = inputs(FLAGS.input, batch_size=FLAGS.batch_size)
   print(ops) 
+
+  eval_ops = None
+  if FLAGS.valid_input:
+    #eval_ops = inputs(FLAGS.valid_input, batch_size=FLAGS.batch_size*10)
+    eval_ops = inputs(FLAGS.valid_input, batch_size=FLAGS.batch_size)
   
   timer = Timer()
-  tf_flow(lambda sess, step: train_once(sess, step, ops, model, optimizer))
+  tf_flow(lambda sess, step: process_once(sess, step, ops, eval_ops, model, optimizer))
   print(timer.elapsed())
     
 
 def main(_):
-  read_records()
+  train()
 
 if __name__ == '__main__':
   tf.app.run()

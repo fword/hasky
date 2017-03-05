@@ -17,7 +17,7 @@ import melt
 import gezi
 from melt.utils import logging
 
-def tf_flow(train_once, num_steps=None, sess=None):
+def tf_flow(process_once, num_steps=None, sess=None):
   """
   basic flow for tf records, allow most freedom for usage, if not tfrecords no need for flow
   Args:
@@ -35,7 +35,7 @@ def tf_flow(train_once, num_steps=None, sess=None):
   try:
     step = 0
     while not coord.should_stop():
-      stop = train_once(sess, step)
+      stop = process_once(sess, step)
       if stop is True:
         print('Early stop running %d stpes'%(step))
         raise tf.errors.OutOfRangeError(None, None,'Early stop running %d stpes'%(step))

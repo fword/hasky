@@ -48,6 +48,7 @@ class Seq2Seq(nn.Module):
 
         self.output_max_len = 14
 
+
     def init_weights(self, initrange):
         for param in self.parameters():
             param.data.uniform_(-initrange, initrange)
