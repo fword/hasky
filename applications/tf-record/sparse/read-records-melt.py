@@ -39,6 +39,7 @@ def read_once(sess, step, ops):
       print(y)
 
 from melt.flow import tf_flow
+
 def read_records():
   # Tell TensorFlow that the model will be built into the default Graph.
   inputs = melt.read_sparse.inputs
