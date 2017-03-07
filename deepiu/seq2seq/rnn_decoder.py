@@ -219,10 +219,12 @@ class RnnDecoder(Decoder):
 
     if self.is_training:
       (attention_keys, attention_values, attention_score_fn,
-             attention_construct_fn) = (tf.contrib.seq2seq.prepare_attention(
+             #attention_construct_fn) = (tf.contrib.seq2seq.prepare_attention(
+             attention_construct_fn) = (melt.seq2seq.prepare_attention(
                  attention_states, attention_option, decoder_hidden_size))
 
-    decoder_fn_train = tf.contrib.seq2seq.attention_decoder_fn_train(
+    #decoder_fn_train = tf.contrib.seq2seq.attention_decoder_fn_train(
+    decoder_fn_train = melt.seq2seq.attention_decoder_fn_train(
         encoder_state=state,
         attention_keys=attention_keys,
         attention_values=attention_values,
@@ -230,7 +232,8 @@ class RnnDecoder(Decoder):
         attention_construct_fn=attention_construct_fn)
 
     (decoder_outputs_train, decoder_state_train, _) = (
-                  tf.contrib.seq2seq.dynamic_rnn_decoder(
+                  #tf.contrib.seq2seq.dynamic_rnn_decoder(
+                  melt.seq2seq.dynamic_rnn_decoder(
                       cell=self.cell,
                       decoder_fn=decoder_fn_train,
                       inputs=inputs,
@@ -303,8 +306,9 @@ class RnnDecoder(Decoder):
                   num_decoder_symbols=self.vocab_size,
                   dtype=tf.int32)
 
-    (decoder_outputs_inference, decoder_state_inference,
-      decoder_context_state_inference) = (tf.contrib.seq2seq.dynamic_rnn_decoder(
+    (decoder_outputs_inference, decoder_state_inference, 
+     #decoder_context_state_inference) = (tf.contrib.seq2seq.dynamic_rnn_decoder(
+      decoder_context_state_inference) = (melt.seq2seq.dynamic_rnn_decoder(
                cell=self.cell,
                decoder_fn=decoder_fn_inference,
                scope=self.scope))
@@ -345,7 +349,8 @@ class RnnDecoder(Decoder):
             num_decoder_symbols=self.vocab_size,
             dtype=tf.int32))
     (decoder_outputs_inference, decoder_state_inference, decoder_context_state_inference) = (
-        tf.contrib.seq2seq.dynamic_rnn_decoder(
+        #tf.contrib.seq2seq.dynamic_rnn_decoder(
+        melt.seq2seq.dynamic_rnn_decoder(
             cell=self.cell,
             decoder_fn=decoder_fn_inference,
             scope=self.scope))

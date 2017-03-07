@@ -66,13 +66,14 @@ def init():
   global vocab, vocab_size
   if vocab is None:
     logging.info('vocab:{}'.format(FLAGS.vocab))
+    logging.info('NUM_RESERVED_IDS:{}'.format(NUM_RESERVED_IDS))
     vocab = Vocabulary(FLAGS.vocab, NUM_RESERVED_IDS)
     vocab_size = vocab.size() if not FLAGS.vocab_size else min(vocab.size(), FLAGS.vocab_size)
     logging.info('vocab_size:{}'.format(vocab_size))
     assert vocab_size > NUM_RESERVED_IDS, 'empty vocab, wrong vocab path? %s'%FLAGS.vocab
-    logging.info('vocab_start:{}'.format(vocab.key(vocab.start_id())))
-    logging.info('vocab_end:{}'.format(vocab.key(vocab.end_id())))
-    logging.info('vocab_unk:{}'.format(vocab.key(vocab.unk_id())))
+    logging.info('vocab_start:{} id:{}'.format(vocab.key(vocab.start_id()), vocab.start_id()))
+    logging.info('vocab_end:{} id:{}'.format(vocab.key(vocab.end_id()), vocab.end_id()))
+    logging.info('vocab_unk:{} id:{}'.format(vocab.key(vocab.unk_id()), vocab.unk_id()))
 
 
 

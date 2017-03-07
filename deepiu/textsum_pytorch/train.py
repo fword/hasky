@@ -25,10 +25,15 @@ from collections import defaultdict
 
 import numpy as np
 
+import gezi
 from gezi import Timer
 import melt 
 from deepiu.util import vocabulary 
 from deepiu.textsum_pytorch import seq2seq
+
+import math
+
+logging = melt.logging
 
 #flags.DEFINE_integer('batch_size', 100, 'Batch size.')
 #flags.DEFINE_integer('num_epochs', 1, 'Number of epochs to run trainer.')
@@ -42,7 +47,10 @@ flags.DEFINE_string('name', 'train', 'records name')
 #flags.DEFINE_boolean('dynamic_batch_length', True, '')
 #flags.DEFINE_boolean('shuffle_then_decode', True, '')
 
-criterion = nn.NLLLoss()
+flags.DEFINE_string('model_dir', '/home/gezi/temp/textsum_pytorch', '')
+
+
+criterion = None
 
 vocab_size = None
 
@@ -65,7 +73,7 @@ def train_once(sess, step, input_text, text, model, optimizer):
     train_once.train_loss = 0.
 
   if not hasattr(train_once, 'summary_writter'):
-    log_dir = '/home/gezi/temp/textsum_pytorch'
+    log_dir = FLAGS.model_dir
     train_once.summary_writer = tf.summary.FileWriter(log_dir, sess.graph)
 
   summary = tf.Summary()
@@ -73,15 +81,19 @@ def train_once(sess, step, input_text, text, model, optimizer):
   pred = model(input_text, text, feed_previous=False)
   
   total_loss = 0.
-  time_steps = text.size()[1]
+  total_words = 0
   batch_size = len(text)
+  time_steps = text.size()[1]
   for time_step in xrange(time_steps - 1):
     y_pred = pred[time_step]
     target = text[:, time_step + 1]
     loss = criterion(y_pred, target)
     total_loss += loss 
+    total_words += target.data.ne(0).sum()
+
+  total_loss /= total_words
+  #total_loss /= batch_size
   optimizer.zero_grad()
-  total_loss /= batch_size
   #print('loss', total_loss)
   total_loss.backward()
   optimizer.step()
@@ -107,14 +119,16 @@ def eval_once(sess, step, input_text, text, model):
   time_steps = text.size()[1]
   batch_size = len(text)
   total_loss = 0.
+  total_words = 0
   for time_step in xrange(time_steps - 1):
     y_pred = pred[time_step]
     target = text[:, time_step + 1]
     loss = criterion(y_pred, target) 
     total_loss += loss
+    total_words += target.data.ne(0).sum()
 
-  total_loss /= batch_size 
-  print('step:', step, 'eval_loss', total_loss.data[0])
+  eval_loss = total_loss / total_words
+  print('step:', step, 'eval_loss', eval_loss.data[0], 'eval_ppl:', math.exp(eval_loss.data[0]))
 
 def process_once(sess, step, ops, eval_ops, model, optimizer):
   input_text, text = read_once(sess, step, ops)
@@ -134,7 +148,20 @@ def train():
   vocabulary.init()
   vocab_size = vocabulary.get_vocab_size() 
 
-  model = seq2seq.Seq2Seq(vocab_size, FLAGS.emb_dim, 
+
+  def seq2seq_criterion(vocabSize):
+    weight = torch.ones(vocabSize)
+    weight[0] = 0
+    crit = nn.NLLLoss(weight, size_average=False)
+    if torch.cuda.is_available():
+        crit.cuda()
+    return crit
+
+  global criterion
+  criterion = seq2seq_criterion(vocab_size)
+
+  model = seq2seq.Seq2Seq(vocab_size, 
+                          FLAGS.emb_dim, 
                           FLAGS.rnn_hidden_size, 
                           FLAGS.batch_size)
 
@@ -170,6 +197,9 @@ def train():
     
 
 def main(_):
+  #-----------init global resource
+  print('batch_size:', FLAGS.batch_size)
+  logging.set_logging_path(gezi.get_dir(FLAGS.model_dir))
   train()
 
 if __name__ == '__main__':

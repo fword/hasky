@@ -32,8 +32,103 @@ from tensorflow.python.util import nest
 from tensorflow.python.ops import tensor_array_ops
 
 __all__ = [
+    "attention_decoder_fn_train",
     "attention_decoder_fn_inference"
 ]
+
+def attention_decoder_fn_train(encoder_state,
+                               attention_keys,
+                               attention_values,
+                               attention_score_fn,
+                               attention_construct_fn,
+                               name=None):
+  """Attentional decoder function for `dynamic_rnn_decoder` during training.
+
+  The `attention_decoder_fn_train` is a training function for an
+  attention-based sequence-to-sequence model. It should be used when
+  `dynamic_rnn_decoder` is in the training mode.
+
+  The `attention_decoder_fn_train` is called with a set of the user arguments
+  and returns the `decoder_fn`, which can be passed to the
+  `dynamic_rnn_decoder`, such that
+
+  ```
+  dynamic_fn_train = attention_decoder_fn_train(encoder_state)
+  outputs_train, state_train = dynamic_rnn_decoder(
+      decoder_fn=dynamic_fn_train, ...)
+  ```
+
+  Further usage can be found in the `kernel_tests/seq2seq_test.py`.
+
+  Args:
+    encoder_state: The encoded state to initialize the `dynamic_rnn_decoder`.
+    attention_keys: to be compared with target states.
+    attention_values: to be used to construct context vectors.
+    attention_score_fn: to compute similarity between key and target states.
+    attention_construct_fn: to build attention states.
+    name: (default: `None`) NameScope for the decoder function;
+      defaults to "simple_decoder_fn_train"
+
+  Returns:
+    A decoder function with the required interface of `dynamic_rnn_decoder`
+    intended for training.
+  """
+  with ops.name_scope(name, "attention_decoder_fn_train", [
+      encoder_state, attention_keys, attention_values, attention_score_fn,
+      attention_construct_fn
+  ]):
+    pass
+
+  def decoder_fn(time, cell_state, cell_input, cell_output, context_state):
+    """Decoder function used in the `dynamic_rnn_decoder` for training.
+
+    Args:
+      time: positive integer constant reflecting the current timestep.
+      cell_state: state of RNNCell.
+      cell_input: input provided by `dynamic_rnn_decoder`.
+      cell_output: output of RNNCell.
+      context_state: context state provided by `dynamic_rnn_decoder`.
+
+    Returns:
+      A tuple (done, next state, next input, emit output, next context state)
+      where:
+
+      done: `None`, which is used by the `dynamic_rnn_decoder` to indicate
+      that `sequence_lengths` in `dynamic_rnn_decoder` should be used.
+
+      next state: `cell_state`, this decoder function does not modify the
+      given state.
+
+      next input: `cell_input`, this decoder function does not modify the
+      given input. The input could be modified when applying e.g. attention.
+
+      emit output: `cell_output`, this decoder function does not modify the
+      given output.
+
+      next context state: `context_state`, this decoder function does not
+      modify the given context state. The context state could be modified when
+      applying e.g. beam search.
+    """
+    with ops.name_scope(
+        name, "attention_decoder_fn_train",
+        [time, cell_state, cell_input, cell_output, context_state]):
+      if cell_state is None:  # first call, return encoder_state
+        cell_state = encoder_state
+
+        # init attention
+        attention = _init_attention(encoder_state)
+      else:
+        # construct attention
+        attention = attention_construct_fn(cell_output, attention_keys,
+                                           attention_values)
+        cell_output = attention
+
+      # combine cell_input and attention
+      next_input = array_ops.concat([cell_input, attention], 1)
+
+      return (None, cell_state, next_input, cell_output, context_state)
+
+  return decoder_fn
 
 import tensorflow as tf
 def gen_attention_context(attention_states, attention_option, decoder_hidden_size):
@@ -223,6 +318,45 @@ def attention_decoder_fn_inference(output_fn,
       return (done, cell_state, next_input, cell_output, context_state)
 
   return decoder_fn
+
+## Helper functions ##
+def prepare_attention(attention_states,
+                      attention_option,
+                      num_units,
+                      reuse=False):
+  """Prepare keys/values/functions for attention.
+
+  Args:
+    attention_states: hidden states to attend over.
+    attention_option: how to compute attention, either "luong" or "bahdanau".
+    num_units: hidden state dimension.
+    reuse: whether to reuse variable scope.
+
+  Returns:
+    attention_keys: to be compared with target states.
+    attention_values: to be used to construct context vectors.
+    attention_score_fn: to compute similarity between key and target states.
+    attention_construct_fn: to build attention states.
+  """
+
+  # Prepare attention keys / values from attention_states
+  with variable_scope.variable_scope("attention_keys", reuse=reuse) as scope:
+    attention_keys = layers.linear(
+        attention_states, num_units, biases_initializer=None, scope=scope)
+  attention_values = attention_states
+
+  # Attention score function
+  attention_score_fn = _create_attention_score_fn("attention_score", num_units,
+                                                  attention_option, reuse)
+
+  # Attention construction function
+  attention_construct_fn = _create_attention_construct_fn("attention_construct",
+                                                          num_units,
+                                                          attention_score_fn,
+                                                          reuse)
+
+  return (attention_keys, attention_values, attention_score_fn,
+          attention_construct_fn)
 
 def _init_attention(encoder_state):
   """Initialize attention. Handling both LSTM and GRU.

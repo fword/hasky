@@ -13,11 +13,13 @@ def repackage_state(h):
 
 
 class Seq2Seq(nn.Module):
-    def __init__(self, encode_ntoken, 
-            input_size, hidden_size,
-            batch_size,
-            nlayers=1, bias=False, attention=False, dropout_p=0.,
-            batch_first=True):
+    def __init__(self, 
+                 encode_ntoken, 
+                 input_size, 
+                 hidden_size,
+                 batch_size,
+                 nlayers=1, bias=False, attention=False, dropout_p=0.,
+                 batch_first=True):
         super(Seq2Seq, self).__init__()
 
         decode_ntoken = encode_ntoken

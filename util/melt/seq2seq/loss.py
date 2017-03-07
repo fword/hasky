@@ -50,7 +50,7 @@ def sequence_loss_by_example(logits, targets, weights,
                       [logits, targets, weights]):
     if softmax_loss_function is None:
       #croosents [batch_size, num_steps]
-      crossents = nn_ops.sparse_softmax_cross_entropy_with_logits(logits, targets)
+      crossents = nn_ops.sparse_softmax_cross_entropy_with_logits(logits=logits, labels=targets)
     else:
       logits_shape = array_ops.shape(logits)
       batch_size = logits_shape[0]
