@@ -202,8 +202,8 @@ class InputApp(object):
                        self.input_valid_name, \
                        self.fixed_input_valid_name]
 
-    #for name in input_name_list:
-    #  input_results[name] = None
+    for name in input_name_list:
+      input_results[name] = None
 
     inputs, decode = input.get_decodes(FLAGS.shuffle_then_decode, FLAGS.dynamic_batch_length)
 

@@ -91,4 +91,3 @@ def gen_eval_generated_texts_ops(input_app, input_results, predictor, eval_score
     print(eval_op)
 
   return eval_ops
-

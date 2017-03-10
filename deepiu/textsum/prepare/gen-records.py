@@ -89,7 +89,7 @@ def _text2ids(text, max_words):
 
   if len(word_ids) == 0:
     return []
-  word_ids = word_ids[:TEXT_MAX_WORDS]
+  word_ids = word_ids[:max_words]
   if FLAGS.pad:
     word_ids = gezi.pad(word_ids, max_words, 0)
 

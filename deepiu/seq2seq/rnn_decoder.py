@@ -48,8 +48,6 @@ import melt
 from deepiu.util import vocabulary
 from deepiu.seq2seq.decoder import Decoder
 
-#TODO??? avoid global?
-attention_keys, attention_values, attention_score_fn, attention_construct_fn = None, None, None, None
 
 class SeqDecodeMethod:
   max_prob = 0
@@ -72,7 +70,7 @@ class RnnDecoder(Decoder):
     assert self.end_id != vocabulary.vocab.unk_id(), 'input vocab generated without end id'
 
     self.emb_dim = emb_dim = FLAGS.emb_dim
-    
+
     #--- for perf problem here exchange w_t and w https://github.com/tensorflow/tensorflow/issues/4138
     self.num_units = num_units = FLAGS.rnn_hidden_size
     with tf.variable_scope('output_projection'):
@@ -169,7 +167,16 @@ class RnnDecoder(Decoder):
  
     return loss
 
-  def sequence_loss_with_attention(self, input, sequence, initial_state=None, attention_states=None, emb=None):
+  def prepare_attention(self, attention_states):
+    decoder_hidden_size = self.num_units
+    attention_option = FLAGS.attention_option  # can be "bahdanau"
+    print('attention_option:', attention_option)
+    assert attention_option is "luong" or attention_option is "bahdanau"
+    attention_keys, attention_values, attention_score_fn, attention_construct_fn = \
+       melt.seq2seq.prepare_attention(attention_states, attention_option, self.num_units)
+    return attention_keys, attention_values, attention_score_fn, attention_construct_fn
+
+  def sequence_loss_with_attention(self, input, sequence, attention_states, initial_state=None,  emb=None):
     if emb is None:
       emb = self.emb
 
@@ -203,42 +210,21 @@ class RnnDecoder(Decoder):
       num_steps = tf.cast(tf.reduce_max(sequence_length), dtype=tf.int32)
       sequence = tf.slice(sequence, [0,0], [-1, num_steps])
 
-
-    #TODO: err... seems work, attention states can be dynamic length? no error ? why ?
-    #if attention_length > 0:
-    #  pass
-
-    attention_option = FLAGS.attention_option  # can be "bahdanau"
-    assert attention_option is "luong" or attention_option is "bahdanau"
-    
-    #attention_states = tf.transpose(attention_states, [1, 0, 2])
-    decoder_hidden_size = self.num_units
-
-    #TODO: better handle tranfer(share) these values to predictor
-    global attention_keys, attention_values, attention_score_fn, attention_construct_fn
-
-    if self.is_training:
-      (attention_keys, attention_values, attention_score_fn,
-             #attention_construct_fn) = (tf.contrib.seq2seq.prepare_attention(
-             attention_construct_fn) = (melt.seq2seq.prepare_attention(
-                 attention_states, attention_option, decoder_hidden_size))
-
-    #decoder_fn_train = tf.contrib.seq2seq.attention_decoder_fn_train(
+    attention_keys, attention_values, attention_score_fn, attention_construct_fn = \
+      self.prepare_attention(attention_states)
     decoder_fn_train = melt.seq2seq.attention_decoder_fn_train(
         encoder_state=state,
         attention_keys=attention_keys,
         attention_values=attention_values,
         attention_score_fn=attention_score_fn,
         attention_construct_fn=attention_construct_fn)
-
-    (decoder_outputs_train, decoder_state_train, _) = (
-                  #tf.contrib.seq2seq.dynamic_rnn_decoder(
+    decoder_outputs_train, decoder_state_train, _ = \
                   melt.seq2seq.dynamic_rnn_decoder(
                       cell=self.cell,
                       decoder_fn=decoder_fn_train,
                       inputs=inputs,
                       sequence_length=tf.cast(sequence_length, tf.int32),
-                      scope=self.scope))
+                      scope=self.scope)
     outputs = decoder_outputs_train
 
     self.final_state = decoder_state_train
@@ -306,12 +292,11 @@ class RnnDecoder(Decoder):
                   num_decoder_symbols=self.vocab_size,
                   dtype=tf.int32)
 
-    (decoder_outputs_inference, decoder_state_inference, 
-     #decoder_context_state_inference) = (tf.contrib.seq2seq.dynamic_rnn_decoder(
-      decoder_context_state_inference) = (melt.seq2seq.dynamic_rnn_decoder(
+    decoder_outputs_inference, decoder_state_inference, decoder_context_state_inference = \
+      melt.seq2seq.dynamic_rnn_decoder(
                cell=self.cell,
                decoder_fn=decoder_fn_inference,
-               scope=self.scope))
+               scope=self.scope)
     
     generated_sequence = tf.transpose(decoder_context_state_inference.stack(), [1, 0])
 
@@ -321,10 +306,9 @@ class RnnDecoder(Decoder):
   #TODO: still has bug FIXME now must evaluate using trainer and eval_show using predictor both with same batch_size, so set smaller eval_batch_size 10 while before set it as 100
   #or can now set num_evaluate_examples 100  
   #Why train and evluate with different batch size is ok? both use trainer not predictor
-  def generate_sequence_with_attention(self, input, max_steps, initial_state=None, 
-                      decode_method=SeqDecodeMethod.max_prob, convert_unk=True, 
-                      emb=None):
-
+  def generate_sequence_with_attention(self, input, max_steps, attention_states, 
+                                       initial_state=None, decode_method=SeqDecodeMethod.max_prob, 
+                                       convert_unk=True, emb=None):
     if emb is None:
       emb = self.emb
 
@@ -334,6 +318,8 @@ class RnnDecoder(Decoder):
     def output_fn(output):
       return tf.nn.xw_plus_b(output, self.w, self.v)
 
+    attention_keys, attention_values, attention_score_fn, attention_construct_fn = \
+      self.prepare_attention(attention_states)
     decoder_fn_inference = (
         melt.seq2seq.attention_decoder_fn_inference(
             output_fn=output_fn,
@@ -348,12 +334,12 @@ class RnnDecoder(Decoder):
             maximum_length=max_steps,
             num_decoder_symbols=self.vocab_size,
             dtype=tf.int32))
-    (decoder_outputs_inference, decoder_state_inference, decoder_context_state_inference) = (
-        #tf.contrib.seq2seq.dynamic_rnn_decoder(
+
+    decoder_outputs_inference, decoder_state_inference, decoder_context_state_inference = \
         melt.seq2seq.dynamic_rnn_decoder(
             cell=self.cell,
             decoder_fn=decoder_fn_inference,
-            scope=self.scope))
+            scope=self.scope)
     
     generated_sequence = tf.transpose(decoder_context_state_inference.stack(), [1, 0])
 
@@ -469,7 +455,11 @@ class RnnDecoder(Decoder):
       return self.end_id
 
   def generate_sequence_by_beam_search(self, input, max_steps, initial_state=None, beam_size=5, 
-                                       convert_unk=True, length_normalization_factor=1.0, emb=None):
+                                       convert_unk=True, length_normalization_factor=1.0, emb=None,
+                                       attention_states=None):
+    """
+    return top (path, score)
+    """
     if emb is None:
       emb = self.emb
 
@@ -487,12 +477,11 @@ class RnnDecoder(Decoder):
     state = self.cell.zero_state(tf.shape(input)[0], tf.float32) if initial_state is None else initial_state
     
     #---TODO: dynamic beam decode not ok right now
-    # return melt.seq2seq.dynamic_beam_decode(input, max_steps, state, 
-    #                                 self.cell, loop_function, scope=self.scope,
-    #                                 beam_size=beam_size, done_token=vocabulary.vocab.end_id(), 
-    #                                 output_projection=(self.w, self.v),
-    #                                 length_normalization_factor=length_normalization_factor,
-    #                                 topn=10)
+    attention_keys, attention_values, attention_score_fn, attention_construct_fn = None, None, None, None
+    if attention_states is not None:
+      attention_keys, attention_values, attention_score_fn, attention_construct_fn = \
+        self.prepare_attention(attention_states)
+
     return melt.seq2seq.beam_decode(input, max_steps, state, 
                                     self.cell, loop_function, scope=self.scope,
                                     beam_size=beam_size, done_token=vocabulary.vocab.end_id(), 

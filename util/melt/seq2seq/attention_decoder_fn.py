@@ -315,6 +315,7 @@ def attention_decoder_fn_inference(output_fn,
           math_ops.equal(time, maximum_length),
           lambda: array_ops.ones([batch_size,], dtype=dtypes.bool),
           lambda: done)
+
       return (done, cell_state, next_input, cell_output, context_state)
 
   return decoder_fn
@@ -412,12 +413,13 @@ def _create_attention_construct_fn(name, num_units, attention_score_fn, reuse):
 # keys: [batch_size, attention_length, attn_size]
 # query: [batch_size, 1, attn_size]
 # return weights [batch_size, attention_length]
-@function.Defun(func_name="attn_add_fun", noinline=True)
+#@function.Defun(func_name="attn_add_fun", noinline=True)
 def _attn_add_fun(v, keys, query):
   return math_ops.reduce_sum(v * math_ops.tanh(keys + query), [2])
 
 
-@function.Defun(func_name="attn_mul_fun", noinline=True)
+#TODO: with below will cause load meta graph fail, see textsum/predict.py
+#@function.Defun(func_name="attn_mul_fun", noinline=True)
 def _attn_mul_fun(keys, query):
   return math_ops.reduce_sum(keys * query, [2])
 
@@ -489,6 +491,9 @@ def _create_attention_score_fn(name,
 
       # Now calculate the attention-weighted vector.
       alignments = array_ops.expand_dims(alignments, 2)
+
+      tf.add_to_collection('alignments', alignments)
+
       context_vector = math_ops.reduce_sum(alignments * values, [1])
       context_vector.set_shape([None, num_units])
 

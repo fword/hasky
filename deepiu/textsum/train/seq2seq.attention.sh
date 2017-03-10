@@ -20,7 +20,7 @@ python ./train.py \
   --fixed_eval_batch_size 10 \
   --num_fixed_evaluate_examples 10 \
   --num_evaluate_examples 100 \
-  --eval_batch_size 100 \
+  --eval_batch_size 200 \
   --debug 0 \
   --show_eval 1 \
   --train_only 0 \

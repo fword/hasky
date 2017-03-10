@@ -29,6 +29,7 @@ from tensorflow.python.ops import rnn
 from tensorflow.python.ops import tensor_array_ops
 from tensorflow.python.ops import variable_scope as vs
 
+import tensorflow as tf
 __all__ = ["dynamic_rnn_decoder"]
 
 def dynamic_rnn_decoder(cell, decoder_fn, inputs=None, sequence_length=None,
@@ -191,7 +192,6 @@ def dynamic_rnn_decoder(cell, decoder_fn, inputs=None, sequence_length=None,
         (next_done, next_cell_state, next_cell_input, emit_output,
          next_context_state) = decoder_fn(time, cell_state, None, cell_output,
                                           context_state)
-
       # check if we are done
       if next_done is None:  # training
         next_done = time >= sequence_length

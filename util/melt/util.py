@@ -39,6 +39,7 @@ def get_session(log_device_placement=False, allow_soft_placement=True):
     config=tf.ConfigProto(
       allow_soft_placement=allow_soft_placement, 
       log_device_placement=log_device_placement)
+    config.operation_timeout_in_ms=600000
     #NOTICE https://github.com/tensorflow/tensorflow/issues/2130 but 5000 will cause init problem!
     #config.operation_timeout_in_ms=50000   # terminate on long hangs
     get_session.sess = tf.Session(config=config)
@@ -173,11 +174,11 @@ def get_model_path(model_dir, model_name=None):
     model_path = model_dir if model_name is None else os.path.join(model_dir, model_name)
   #assert os.path.exists(model_path), model_path
   #tf.logging.log_if(tf.logging.WARN, '%s not exist'%model_path, not os.path.exists(model_path))
-  if not os.path.exists(model_path):
+  #if not os.path.exists(model_path):
     #model_path = None 
     #tf.logging.WARN('%s not exist'%model_path)
     #raise FileNotFoundError(model_path)
-    raise ValueError(model_path)
+    #raise ValueError(model_path)
   return model_path 
 
 def latest_checkpoint(model_dir):
@@ -230,7 +231,7 @@ def restore_from_path(sess, model_path, var_list=None):
   saver = tf.train.Saver(var_list)
   saver.restore(sess, model_path)
   print('restore ok:', model_path)
-  sess.run(tf.initialize_local_variables())
+  sess.run(tf.local_variables_initializer())
   return saver
 
 def load(model_dir, model_name=None):

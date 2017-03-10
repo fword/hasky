@@ -1,14 +1,14 @@
 source ./config 
 
 dir=/home/gezi/temp/textsum/ 
-model_dir=$dir/model.seq2seq
+model_dir=$dir/model.seq2seq.attention
 mkdir -p $model_dir
 
 #--train_input $train_output_path/'train_*' \
 python ./train.py \
   --train_input $train_output_path/'train_*' \
-  --valid_input $valid_output_path/'test_*' \
-	--fixed_valid_input $fixed_valid_output_path/'test' \
+  --valid_input '' \
+	--fixed_valid_input '' \
 	--valid_resource_dir $valid_output_path \
 	--vocab $train_output_path/vocab.txt \
   --num_records_file  $train_output_path/num_records.txt \
@@ -20,11 +20,12 @@ python ./train.py \
   --fixed_eval_batch_size 10 \
   --num_fixed_evaluate_examples 10 \
   --num_evaluate_examples 100 \
-  --eval_batch_size 200 \
+  --eval_batch_size 100 \
   --debug 0 \
   --show_eval 1 \
-  --train_only 0 \
-  --metric_eval 1 \
+  --train_only 1 \
+  --metric_eval 0 \
+  --gen_predict 1 \
   --monitor_level 2 \
   --no_log 0 \
   --batch_size 256 \
@@ -37,14 +38,18 @@ python ./train.py \
   --num_metric_eval_examples 1000 \
   --metric_eval_batch_size 500 \
   --feed_dict 0 \
-  --seg_method $seg_method \
+  --seg_method $online_seg_method \
   --feed_single $feed_single \
   --seq_decode_method 0 \
   --dynamic_batch_length 1 \
-  --use_dynamic_decode 0 \
   --rnn_method 0 \
+  --emb_dim 1000 \
+  --rnn_hidden_size 1023 \
   --add_text_start 1 \
   --rnn_output_method 3 \
+  --use_attention 1 \
+  --cell lstm_block \
+  --mode predict \
   --num_records 0 \
   --min_records 0 \
   --log_device 0 \

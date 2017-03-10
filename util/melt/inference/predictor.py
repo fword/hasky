@@ -44,7 +44,16 @@ class Predictor(object):
       self.restore(model_dir, meta_graph, model_name)
 
   def inference(self, key, feed_dict=None, index=0):
-    return self.sess.run(tf.get_collection(key)[index], feed_dict=feed_dict)
+    if not isinstance(key, (list, tuple)):
+      return self.sess.run(tf.get_collection(key)[index], feed_dict=feed_dict)
+    else:
+      keys = key 
+      if not isinstance(index, (list, tuple)):
+        indexes = [index] * len(keys)
+      else:
+        indexes = index 
+      keys = [tf.get_collection(key)[index] for key,index in zip(keys, indexes)]
+      return self.sess.run(keys, feed_dict=feed_dict)
 
   def predict(self, key, feed_dict=None, index=0):
     return self.inference(key, feed_dict, index)

@@ -245,6 +245,7 @@
     <Compile Include="util\gezi\timer.py" />
     <Compile Include="util\gezi\util.py" />
     <Compile Include="util\gezi\__init__.py" />
+    <Compile Include="util\hasky\__init__.py" />
     <Compile Include="util\melt\apps\logging.py" />
     <Compile Include="util\melt\apps\read.py" />
     <Compile Include="util\melt\apps\train.py" />
@@ -419,6 +420,7 @@
     <Folder Include="tests\flags" />
     <Folder Include="util\" />
     <Folder Include="util\gezi" />
+    <Folder Include="util\hasky\" />
     <Folder Include="util\melt" />
     <Folder Include="util\melt\apps\" />
     <Folder Include="util\melt\flow\" />
@@ -1248,6 +1250,7 @@
     <Content Include="deepiu\textsum\train\seq2seq.sh" />
     <Content Include="deepiu\textsum\__init__.pyc" />
     <Content Include="deepiu\textsum_pytorch\input.pyc" />
+    <Content Include="deepiu\textsum_pytorch\train.sh" />
     <Content Include="deepiu\util\input_flags.pyc" />
     <Content Include="deepiu\util\text2ids.pyc" />
     <Content Include="deepiu\util\vocabulary.pyc" />

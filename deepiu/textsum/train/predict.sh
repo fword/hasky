@@ -20,7 +20,7 @@ python ./train.py \
   --fixed_eval_batch_size 10 \
   --num_fixed_evaluate_examples 10 \
   --num_evaluate_examples 100 \
-  --eval_batch_size 200 \
+  --eval_batch_size 100 \
   --debug 0 \
   --show_eval 1 \
   --train_only 0 \
@@ -37,7 +37,7 @@ python ./train.py \
   --num_metric_eval_examples 1000 \
   --metric_eval_batch_size 500 \
   --feed_dict 0 \
-  --seg_method $seg_method \
+  --seg_method $online_seg_method \
   --feed_single $feed_single \
   --seq_decode_method 0 \
   --dynamic_batch_length 1 \
@@ -45,6 +45,7 @@ python ./train.py \
   --rnn_method 0 \
   --add_text_start 1 \
   --rnn_output_method 3 \
+  --mode predict \
   --num_records 0 \
   --min_records 0 \
   --log_device 0 \

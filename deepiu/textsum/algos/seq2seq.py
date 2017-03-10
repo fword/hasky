@@ -58,7 +58,7 @@ class Seq2seq(object):
       if not FLAGS.use_attention:
         loss = self.decoder.sequence_loss(None, text, state)
       else:
-        loss = self.decoder.sequence_loss_with_attention(None, text, state, encoder_output)
+        loss = self.decoder.sequence_loss_with_attention(None, text, encoder_output, state)
       tf.add_to_collection('scores', loss)
     
     if not self.is_predict:
@@ -94,13 +94,12 @@ class Seq2seqPredictor(Seq2seq, melt.PredictorBase):
 
     return text, score
 
-
-  def predict_text(self, input_texts, index=0):
+  def predict_text(self, input_text, index=0):
     feed_dict = {
-      self.input_text_place: input_texts,
+      self.input_text_place: input_text,
       }
 
-    vocab = vocabulary.get_vocab()
+    #vocab = vocabulary.get_vocab()
 
     generated_words = self.sess.run(self.text_list[index], feed_dict) 
     texts = idslist2texts(generated_words)
@@ -149,6 +148,7 @@ class Seq2seqPredictor(Seq2seq, melt.PredictorBase):
     with tf.variable_scope("decode"):
       #return self.decoder.generate_sequence(encoder_output, TEXT_MAX_WORDS, state, decode_method, beam_size, convert_unk)
       #return self.decoder.generate_sequence(encoder_output, TEXT_MAX_WORDS, None, decode_method, beam_size, convert_unk)
+      #TODO notice encoder_output here just used to get batch size
       decoder_input = self.decoder.get_start_embedding_input(encoder_output)
 
       if not FLAGS.use_attention:
@@ -164,14 +164,20 @@ class Seq2seqPredictor(Seq2seq, melt.PredictorBase):
       else:
         #TODO: add beam search support
         if decode_method != SeqDecodeMethod.beam_search or not FLAGS.use_beam_search:
-          return self.decoder.generate_sequence_with_attention(decoder_input, TEXT_MAX_WORDS, state, decode_method, convert_unk)
+          return self.decoder.generate_sequence_with_attention(decoder_input, 
+                                                               TEXT_MAX_WORDS, 
+                                                               encoder_output, 
+                                                               state, 
+                                                               decode_method, 
+                                                               convert_unk)
         else:
           return self.decoder.generate_sequence_by_beam_search(decoder_input, 
                                                                TEXT_MAX_WORDS, 
                                                                state, 
                                                                beam_size, 
                                                                convert_unk,
-                                                               length_normalization_factor=0.)
+                                                               length_normalization_factor=0.,
+                                                               attention_states=encoder_output)
 
   def build_predict_graph(self, input_text, text, input_text_max_words=INPUT_TEXT_MAX_WORDS, text_max_words=TEXT_MAX_WORDS):
     input_text = tf.reshape(input_text, [-1, input_text_max_words])

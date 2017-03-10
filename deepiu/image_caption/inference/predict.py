@@ -48,18 +48,18 @@ predictor.load(sys.argv[2])
 
 ids_list = []
 for line in open(sys.argv[1]):
-	line = line.strip().split('\t')[-1]
-	words = line.split()
-	ids = [vocabulary.id(word) for word in text.split(WORDS_SEP) if vocabulary.has(word) or ENCODE_UNK]
-	ids = gezi.pad(ids, TEXT_MAX_WORDS)
-	ids_list.append(ids)
+  line = line.strip().split('\t')[-1]
+  words = line.split()
+  ids = [vocabulary.id(word) for word in text.split(WORDS_SEP) if vocabulary.has(word) or ENCODE_UNK]
+  ids = gezi.pad(ids, TEXT_MAX_WORDS)
+  ids_list.append(ids)
 
 ids_list = np.array(ids_list)
 
 for line in sys.stdin:
-	l = line.strip().split('\t')
-	image_names = l[0]
-	image_features = np.array([[float(x) for x in l[1:]]])
+  l = line.strip().split('\t')
+  image_names = l[0]
+  image_features = np.array([[float(x) for x in l[1:]]])
 
 
 
