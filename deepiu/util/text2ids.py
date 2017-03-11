@@ -112,3 +112,6 @@ def segment(text, seg_method='default'):
 
 def texts2ids(texts, seg_method='default', feed_single=False, allow_all_zero=False, pad=True):
   return np.array([text2ids(text, seg_method, feed_single, allow_all_zero, pad) for text in texts])
+
+def end_id():
+  return vocab.end_id()

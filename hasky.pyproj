@@ -214,6 +214,7 @@
     <Compile Include="deepiu\textsum\eval_show.py" />
     <Compile Include="deepiu\textsum\inference.py" />
     <Compile Include="deepiu\textsum\inference\conf.py" />
+    <Compile Include="deepiu\textsum\inference\inference-score.py" />
     <Compile Include="deepiu\textsum\inference\inference.py" />
     <Compile Include="deepiu\textsum\inference\predict.py" />
     <Compile Include="deepiu\textsum\input.py" />
