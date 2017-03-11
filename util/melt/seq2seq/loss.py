@@ -112,8 +112,10 @@ def sequence_loss(logits,
       return cost
 
 
-#sample loss must be None 
-def exact_predict_loss(self, logits, batch_size, num_steps):
+#sample loss must be None
+import tensorflow as tf  
+import melt
+def exact_predict_loss(logits, targets, mask, batch_size, num_steps):
   #logits = tf.reshape(logits, [batch_size, -1, self.vocab_size])
   i = tf.constant(0, dtype=tf.int32)
   condition = lambda i, log_probs: tf.less(i, num_steps)

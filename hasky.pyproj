@@ -20,7 +20,6 @@
   <PropertyGroup Condition="'$(Configuration)' == 'Release'" />
   <PropertyGroup>
     <VisualStudioVersion Condition=" '$(VisualStudioVersion)' == '' ">10.0</VisualStudioVersion>
-    <PtvsTargetsFile>$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets</PtvsTargetsFile>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="applications\classification\decode.py" />
@@ -213,6 +212,10 @@
     <Compile Include="deepiu\textsum\algos\__init__.py" />
     <Compile Include="deepiu\textsum\conf.py" />
     <Compile Include="deepiu\textsum\eval_show.py" />
+    <Compile Include="deepiu\textsum\inference.py" />
+    <Compile Include="deepiu\textsum\inference\conf.py" />
+    <Compile Include="deepiu\textsum\inference\inference.py" />
+    <Compile Include="deepiu\textsum\inference\predict.py" />
     <Compile Include="deepiu\textsum\input.py" />
     <Compile Include="deepiu\textsum\input_app.py" />
     <Compile Include="deepiu\textsum\prepare\conf.py" />
@@ -386,6 +389,7 @@
     <Folder Include="deepiu\textsum\data\wordseg\wordrank\trkdict\iqfdict\" />
     <Folder Include="deepiu\textsum\data\wordseg\wordrank\trkdict\model\" />
     <Folder Include="deepiu\textsum\data\wordseg\wordrank\wordtagdict\" />
+    <Folder Include="deepiu\textsum\inference\" />
     <Folder Include="deepiu\textsum\prepare\" />
     <Folder Include="deepiu\textsum\prepare\conf\" />
     <Folder Include="deepiu\textsum\prepare\data\" />
@@ -978,6 +982,11 @@
     <Content Include="deepiu\textsum\data\wordseg\wordrank\wordtagdict\word_tag.txt" />
     <Content Include="deepiu\textsum\data\wordseg\wordrank\xuxiaoming01_130318113058.md5" />
     <Content Include="deepiu\textsum\eval_show.pyc" />
+    <Content Include="deepiu\textsum\inference\conf.pyc" />
+    <Content Include="deepiu\textsum\inference\config" />
+    <Content Include="deepiu\textsum\inference\inference-attention.sh" />
+    <Content Include="deepiu\textsum\inference\inference.sh" />
+    <Content Include="deepiu\textsum\inference\predict.sh" />
     <Content Include="deepiu\textsum\input.pyc" />
     <Content Include="deepiu\textsum\input_app.pyc" />
     <Content Include="deepiu\textsum\prepare\conf.pyc" />
@@ -1276,6 +1285,5 @@
     <Content Include="util\melt\utils\logging.pyc" />
     <Content Include="util\melt\utils\__init__.pyc" />
   </ItemGroup>
-  <Import Project="$(PtvsTargetsFile)" Condition="Exists($(PtvsTargetsFile))" />
-  <Import Project="$(MSBuildToolsPath)\Microsoft.Common.targets" Condition="!Exists($(PtvsTargetsFile))" />
+  <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets" />
 </Project>

@@ -1,10 +1,11 @@
 source ./config 
 
-python ./predict.py \
+python ./inference/predict.py \
   --algo seq2seq \
+  --model_dir /home/gezi/temp/textsum/model.seq2seq.attention/ \
   --num_sampled 256 \
   --log_uniform_sample 1 \
-  --seg_method $seg_method \
+  --seg_method $online_seg_method \
   --feed_single $feed_single \
   --seq_decode_method 0 \
   --dynamic_batch_length 1 \
@@ -14,4 +15,5 @@ python ./predict.py \
   --add_text_start 1 \
   --rnn_output_method 3 \
   --use_attention 1 \
-  --cell lstm_block 
+  --cell lstm_block \
+  --algo seq2seq

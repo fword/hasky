@@ -4,8 +4,7 @@ dir=/home/gezi/temp/textsum/
 model_dir=$dir/model.seq2seq
 mkdir -p $model_dir
 
-#--train_input $train_output_path/'train_*' \
-python ./train.py \
+python ./inference/predict.py \
   --train_input $train_output_path/'train_*' \
   --valid_input $valid_output_path/'test_*' \
 	--fixed_valid_input $fixed_valid_output_path/'test' \
@@ -20,7 +19,7 @@ python ./train.py \
   --fixed_eval_batch_size 10 \
   --num_fixed_evaluate_examples 10 \
   --num_evaluate_examples 100 \
-  --eval_batch_size 200 \
+  --eval_batch_size 100 \
   --debug 0 \
   --show_eval 1 \
   --train_only 0 \
@@ -45,6 +44,7 @@ python ./train.py \
   --rnn_method 0 \
   --add_text_start 1 \
   --rnn_output_method 3 \
+  --mode predict \
   --main_scope run \
   --num_records 0 \
   --min_records 0 \

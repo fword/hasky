@@ -38,7 +38,7 @@ python ./train.py \
   --num_metric_eval_examples 1000 \
   --metric_eval_batch_size 500 \
   --feed_dict 0 \
-  --seg_method $seg_method \
+  --seg_method $online_seg_method \
   --feed_single $feed_single \
   --seq_decode_method 0 \
   --dynamic_batch_length 1 \

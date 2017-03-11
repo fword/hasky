@@ -13,4 +13,3 @@ from __future__ import division
 from __future__ import print_function
 
 from deepiu.textsum.algos import seq2seq
-from deepiu.textsum.algos import seq2seq_attention

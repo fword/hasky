@@ -75,7 +75,6 @@ def gen_eval_generated_texts_ops(input_app, input_results, predictor, eval_score
 
   generated_texts_beam, generated_texts_score_beam = predictor.build_predict_text_graph(
                       evaluate_input_text, 
-                      #decode_method=FLAGS.seq_decode_method, 
                       decode_method=SeqDecodeMethod.beam_search,  #beam search
                       beam_size=FLAGS.beam_size,
                       convert_unk=False)

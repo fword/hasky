@@ -58,10 +58,18 @@ flags.DEFINE_boolean('train_only', False, '')
 flags.DEFINE_string('work_mode', 'full', 'full/train_valid_show_metric, train, test, train_metric, train_valid, train_valid_metric')
 flags.DEFINE_integer('monitor_level', 2, '1 will monitor emb, 2 will monitor gradient')
 flags.DEFINE_boolean('no_log', False, '')
+flags.DEFINE_string('mode', 'train', 'or predict')
+
 
 #----------multi gpu
 flags.DEFINE_integer('num_gpus', 0, """How many GPUs to use. set 0 to disable multi gpu mode""")
 tf.app.flags.DEFINE_boolean('log_device_placement', False, """Whether to log device placement.""")
+
+#----------scope
+flags.DEFINE_boolean('add_global_scope', True, '''default will add global scope as algo name,
+                      set to False incase you want to load some old model without algo scope''')
+flags.DEFINE_string('global_scope', '', '')
+flags.DEFINE_string('main_scope', 'main', 'or use other main_scope like run, this is mainly graph scope for varaible reuse')
 
 
 __pacage__ = None 

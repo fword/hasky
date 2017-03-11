@@ -116,19 +116,11 @@ def tf_train_flow(train_once,
       pre_step *= num_steps_per_epoch
     #for non 0 eopochs  without this will be
     #Attempting to use uninitialized value input/input_producer/limit_epochs/epochs
-    try:
-     sess.run(tf.local_variables_initializer())
-    except Exception:
-      sess.run(tf.initialize_local_variables())
+    sess.run(tf.local_variables_initializer())
   else:
     print('Train all start step 0', file=sys.stderr)
-    try:
-      init_op = tf.group(tf.global_variables_initializer(),
-                         tf.local_variables_initializer())
-    except Exception:
-      init_op = tf.group(tf.initialize_all_variables(),
-                         tf.initialize_local_variables())
-
+    init_op = tf.group(tf.global_variables_initializer(),
+                       tf.local_variables_initializer())
     sess.run(init_op)
   
   if save_interval_epochs and num_steps_per_epoch:

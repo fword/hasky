@@ -40,7 +40,7 @@ python ./train.py \
   --seg_method $online_seg_method \
   --feed_single $feed_single \
   --seq_decode_method 0 \
-  --dynamic_batch_length 1 \
+  --dynamic_batch_length 0 \
   --use_dynamic_decode 0 \
   --rnn_method 0 \
   --add_text_start 1 \

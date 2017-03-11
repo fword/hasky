@@ -86,9 +86,9 @@ class Seq2seqPredictor(Seq2seq, melt.PredictorBase):
     #because it is a shared place holder, if here not, even reuse variable, 
     #will generate more then 1 place holder, reuse not for placeholder
     text, score = self.build_predict_text_graph(self.input_text_place, 
-      decode_method, 
-      beam_size, 
-      convert_unk)
+                                                decode_method, 
+                                                beam_size, 
+                                                convert_unk)
 
     self.text_list.append(text)
 
@@ -121,6 +121,31 @@ class Seq2seqPredictor(Seq2seq, melt.PredictorBase):
       self.text_place: text.reshape([-1, TEXT_MAX_WORDS]),
     }
     score = self.sess.run(self.score, feed_dict)
+    score = score.reshape((len(text),))
+    return score
+
+  def init_exact_predict(self, input_text_max_words=INPUT_TEXT_MAX_WORDS, text_max_words=TEXT_MAX_WORDS):
+    self.text_place = tf.placeholder(tf.int64, [None, text_max_words], name='text')
+    
+    predict_no_sample = FLAGS.predict_no_sample
+    FLAGS.predict_no_sample = True
+
+    self.exact_score = self.build_predict_graph(self.input_text_place, self.text_place, 
+                                                input_text_max_words, text_max_words)
+    
+    FLAGS.predict_no_sample = predict_no_sample
+
+    return self.exact_score
+
+  def eaxct_predict(self, input_text, text):
+    """
+    default usage is one single input text, single text predict one sim score
+    """
+    feed_dict = {
+      self.input_text_place: input_text.reshape([-1, INPUT_TEXT_MAX_WORDS]),
+      self.text_place: text.reshape([-1, TEXT_MAX_WORDS]),
+    }
+    score = self.sess.run(self.exact_score, feed_dict)
     score = score.reshape((len(text),))
     return score
 
@@ -160,7 +185,7 @@ class Seq2seqPredictor(Seq2seq, melt.PredictorBase):
                                                                state, 
                                                                beam_size, 
                                                                convert_unk,
-                                                               length_normalization_factor=0.)
+                                                               length_normalization_factor=FLAGS.length_normalization_factor)
       else:
         #TODO: add beam search support
         if decode_method != SeqDecodeMethod.beam_search or not FLAGS.use_beam_search:
@@ -176,7 +201,7 @@ class Seq2seqPredictor(Seq2seq, melt.PredictorBase):
                                                                state, 
                                                                beam_size, 
                                                                convert_unk,
-                                                               length_normalization_factor=0.,
+                                                               length_normalization_factor=FLAGS.length_normalization_factor,
                                                                attention_states=encoder_output)
 
   def build_predict_graph(self, input_text, text, input_text_max_words=INPUT_TEXT_MAX_WORDS, text_max_words=TEXT_MAX_WORDS):

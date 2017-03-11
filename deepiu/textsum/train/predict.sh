@@ -46,6 +46,7 @@ python ./train.py \
   --add_text_start 1 \
   --rnn_output_method 3 \
   --mode predict \
+  --main_scope run \
   --num_records 0 \
   --min_records 0 \
   --log_device 0 \

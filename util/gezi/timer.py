@@ -31,6 +31,9 @@ class Timer():
     duration = end_time - self.start_time
     self.start_time = end_time 
     return duration  
+
+  def elapsed_ms(self):
+    return self.elapsed() * 1000
   
   def print(self):
     if self.info:

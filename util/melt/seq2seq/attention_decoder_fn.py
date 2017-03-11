@@ -492,8 +492,6 @@ def _create_attention_score_fn(name,
       # Now calculate the attention-weighted vector.
       alignments = array_ops.expand_dims(alignments, 2)
 
-      tf.add_to_collection('alignments', alignments)
-
       context_vector = math_ops.reduce_sum(alignments * values, [1])
       context_vector.set_shape([None, num_units])
 

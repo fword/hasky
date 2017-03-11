@@ -31,7 +31,7 @@ flags.DEFINE_boolean('input_with_end_mark', False, """if input has already with 
 
 flags.DEFINE_boolean('predict_with_end_mark', True, """if predict with </S> end mark""")
 
-flags.DEFINE_float('length_normalization_factor', 1.0, """If != 0, a number x such that captions are
+flags.DEFINE_float('length_normalization_factor', 0., """If != 0, a number x such that captions are
         scored by logprob/length^x, rather than logprob. This changes the
         relative scores of captions depending on their lengths. For example, if
         x > 0 then longer captions will be favored.  see tensorflow/models/im2text""")
@@ -50,7 +50,7 @@ from deepiu.seq2seq.decoder import Decoder
 
 
 class SeqDecodeMethod:
-  max_prob = 0
+  greedy = 0
   sample = 1
   full_sample = 2
   beam_search = 3
@@ -140,7 +140,8 @@ class RnnDecoder(Decoder):
                                        scope=self.scope)
     self.final_state = state
     
-    if self.softmax_loss_function is None:
+    #TODO: hack here add FLAGS.predict_no_sample just for Seq2seqPredictor exact_predict
+    if self.softmax_loss_function is None or FLAGS.predict_no_sample:
       #[batch_size, num_steps, num_units] * [num_units, vocab_size] -> logits [batch_size, num_steps, vocab_size]
       logits = melt.batch_matmul_embedding(outputs, self.w) + self.v
     else:
@@ -151,7 +152,7 @@ class RnnDecoder(Decoder):
     mask = tf.cast(tf.sign(sequence), dtype=tf.float32)
     
     if self.is_predict and FLAGS.predict_no_sample:
-      loss = melt.seq2seq.exact_predict_loss(logits, batch_size, num_steps)
+      loss = melt.seq2seq.exact_predict_loss(logits, targets, mask, batch_size, num_steps)
     else:
       #loss [batch_size,] 
       loss = melt.seq2seq.sequence_loss_by_example(
@@ -229,7 +230,7 @@ class RnnDecoder(Decoder):
 
     self.final_state = decoder_state_train
     
-    if self.softmax_loss_function is None:
+    if self.softmax_loss_function is None or FLAGS.predict_no_sample:
       #[batch_size, num_steps, num_units] * [num_units, vocab_size] -> logits [batch_size, num_steps, vocab_size]
       logits = melt.batch_matmul_embedding(outputs, self.w) + self.v
     else:
@@ -240,7 +241,7 @@ class RnnDecoder(Decoder):
     mask = tf.cast(tf.sign(sequence), dtype=tf.float32)
     
     if self.is_predict and FLAGS.predict_no_sample:
-      loss = melt.seq2seq.exact_predict_loss(logits, batch_size, num_steps)
+      loss = melt.seq2seq.exact_predict_loss(logits, targets, mask, batch_size, num_steps)
     else:
       #loss [batch_size,] 
       loss = melt.seq2seq.sequence_loss_by_example(
@@ -271,7 +272,7 @@ class RnnDecoder(Decoder):
 
 
   def generate_sequence(self, input, max_steps, initial_state=None, 
-                        decode_method=SeqDecodeMethod.max_prob, convert_unk=True, 
+                        decode_method=SeqDecodeMethod.greedy, convert_unk=True, 
                         emb=None):
     if emb is None:
       emb = self.emb
@@ -307,7 +308,7 @@ class RnnDecoder(Decoder):
   #or can now set num_evaluate_examples 100  
   #Why train and evluate with different batch size is ok? both use trainer not predictor
   def generate_sequence_with_attention(self, input, max_steps, attention_states, 
-                                       initial_state=None, decode_method=SeqDecodeMethod.max_prob, 
+                                       initial_state=None, decode_method=SeqDecodeMethod.greedy, 
                                        convert_unk=True, emb=None):
     if emb is None:
       emb = self.emb
@@ -427,8 +428,8 @@ class RnnDecoder(Decoder):
       return None
 
   def normalize_length(self, loss, sequence_length):
+    sequence_length = tf.cast(sequence_length, tf.float32)
     if not FLAGS.predict_no_sample:
-      sequence_length = tf.cast(sequence_length, tf.float32)
       sequence_length = tf.reshape(sequence_length, [-1, 1])
       loss = loss * sequence_length 
     normalize_factor = tf.pow(sequence_length, FLAGS.length_normalization_factor)

@@ -24,5 +24,5 @@ def sparse_tensor_to_dense(input_tensor, maxlen=0):
     return tf.sparse_tensor_to_dense(input_tensor)
   else:
     return tf.sparse_to_dense(input_tensor.indices, 
-                              [input_tensor.shape[0], maxlen], 
+                              [input_tensor.dense_shape[0], maxlen], 
                               input_tensor.values)

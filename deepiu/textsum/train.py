@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- coding: gbk -*-
 # ==============================================================================
 #          \file   train.py
 #        \author   chenghuige  
@@ -39,11 +40,6 @@ FLAGS = flags.FLAGS
 flags.DEFINE_string('model_dir', '/home/gezi/temp/textsum/model', '')
 
 flags.DEFINE_string('algo', 'seq2seq', 'default algo is bow(cbow), also support rnn, show_and_tell, TODO cnn')
-
-flags.DEFINE_boolean('add_global_scope', True, '''default will add global scope as algo name,
-                      set to False incase you want to load some old model without algo scope''')
-
-flags.DEFINE_string('global_scope', '', '')
 
 flags.DEFINE_string('vocab', '/home/gezi/temp/textsum/tfrecord/seq-basic.10w/train/vocab.txt', 'vocabulary file')
 
@@ -171,26 +167,31 @@ def gen_predict_graph(predictor):
   score = predictor.init_predict()
   tf.add_to_collection('score', score)
 
+  exact_score = predictor.init_exact_predict()
+  tf.add_to_collection('exact_score', exact_score)
+
   #-----generateive
   text, text_score = predictor.init_predict_text(decode_method=FLAGS.seq_decode_method, 
                                                  beam_size=FLAGS.beam_size,
                                                  convert_unk=False)
   
   beam_text, beam_text_score = predictor.init_predict_text(decode_method=SeqDecodeMethod.beam_search, 
-                                                 beam_size=FLAGS.beam_size,
-                                                 convert_unk=False)
+                                                           beam_size=FLAGS.beam_size,
+                                                           convert_unk=False)
       
   tf.add_to_collection('text', text)
   tf.add_to_collection('text_score', text_score)
   tf.add_to_collection('beam_text', beam_text)          
   tf.add_to_collection('beam_text_score', beam_text_score)          
 
+  return beam_text, beam_text_score
+
 #step = 0
 def train_process(trainer, predictor=None):
   input_app = InputApp.InputApp()
   input_results = input_app.gen_input()
 
-  with tf.variable_scope('main') as scope:
+  with tf.variable_scope(FLAGS.main_scope) as scope:
     ops, gen_feed_dict, deal_results = gen_train(
       input_app, 
       input_results, 
@@ -198,7 +199,7 @@ def train_process(trainer, predictor=None):
     scope.reuse_variables()
 
     if predictor is not None and FLAGS.gen_predict:
-      gen_predict_graph(predictor)
+      beam_text, beam_text_score = gen_predict_graph(predictor)
 
     eval_ops, gen_eval_feed_dict, deal_eval_results = gen_validate(
       input_app, 
@@ -212,19 +213,57 @@ def train_process(trainer, predictor=None):
       if not algos_factory.is_generative(FLAGS.algo): 
         metric_eval_function = lambda: evaluator.evaluate_scores(predictor, random=True)
 
-  melt.apps.train_flow(ops, 
-                       gen_feed_dict=gen_feed_dict,
-                       deal_results=deal_results,
-                       eval_ops=eval_ops,
-                       gen_eval_feed_dict=gen_eval_feed_dict,
-                       deal_eval_results=deal_eval_results,
-                       optimizer=FLAGS.optimizer,
-                       learning_rate=FLAGS.learning_rate,
-                       num_steps_per_epoch=input_app.num_steps_per_epoch,
-                       model_dir=FLAGS.model_dir,
-                       metric_eval_function=metric_eval_function,
-                       sess=sess)#notice if use melt.constant in predictor then must pass sess
-  
+  if FLAGS.mode == 'train':
+    melt.apps.train_flow(ops, 
+                         gen_feed_dict=gen_feed_dict,
+                         deal_results=deal_results,
+                         eval_ops=eval_ops,
+                         gen_eval_feed_dict=gen_eval_feed_dict,
+                         deal_eval_results=deal_eval_results,
+                         optimizer=FLAGS.optimizer,
+                         learning_rate=FLAGS.learning_rate,
+                         num_steps_per_epoch=input_app.num_steps_per_epoch,
+                         model_dir=FLAGS.model_dir,
+                         metric_eval_function=metric_eval_function,
+                         sess=sess)#notice if use melt.constant in predictor then must pass sess
+  else: #test predict
+    predictor.load(FLAGS.model_dir)
+    import conf  
+    from conf import TEXT_MAX_WORDS, INPUT_TEXT_MAX_WORDS, NUM_RESERVED_IDS, ENCODE_UNK
+
+    #TODO: now copy from prpare/gen-records.py
+    def _text2ids(text, max_words):
+      word_ids = text2ids.text2ids(text, 
+                                   seg_method=FLAGS.seg_method, 
+                                   feed_single=FLAGS.feed_single, 
+                                   allow_all_zero=True, 
+                                   pad=False)
+      word_ids_length = len(word_ids)
+      word_ids = word_ids[:max_words]
+      word_ids = gezi.pad(word_ids, max_words, 0)
+      return word_ids
+
+    input_texts = ['包邮买二送一性感女内裤低腰诱惑透视蕾丝露臀大蝴蝶三角内裤女夏-淘宝网',
+                   '大棚辣椒果实变小怎么办,大棚辣椒果实变小防治措施']
+
+    for input_text in input_texts:
+      word_ids = _text2ids(input_text, INPUT_TEXT_MAX_WORDS)
+      print('word_ids', word_ids, 'len:', len(word_ids))
+      print(text2ids.ids2text(word_ids))
+      #similar as inference.py this is only ok for no attention mode TODO FIXME
+      texts, scores = sess.run([tf.get_collection('text')[0], tf.get_collection('text_score')[0]], 
+                             feed_dict={'seq2seq/model_init_1/input_text:0' : [word_ids]})
+      print(texts[0], text2ids.ids2text(texts[0]), scores[0])
+
+      texts, scores = sess.run([beam_text, beam_text_score], 
+                               feed_dict={predictor.input_text_place: [word_ids]})
+
+      texts = texts[0]
+      scores = scores[0]
+      for text, score in zip(texts, scores):
+        print(text, text2ids.ids2text(text), score)
+
+
 def train():
   trainer, predictor =  algos_factory.gen_trainer_and_predictor(FLAGS.algo)
 
