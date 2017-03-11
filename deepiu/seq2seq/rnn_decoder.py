@@ -101,6 +101,7 @@ class RnnDecoder(Decoder):
 
   #for show and tell input is image input feature
   #for textsum input is None, sequence will pad <GO> 
+  #TODO since exact_porb and exact_loss same value, will remove exact_prob
   def sequence_loss(self, input, sequence, 
                     initial_state=None, attention_states=None, 
                     exact_prob=False, exact_loss=False,
@@ -186,7 +187,7 @@ class RnnDecoder(Decoder):
       loss = melt.seq2seq.exact_predict_loss(logits, targets, mask, num_steps, batch_size)
     elif self.is_predict and exact_loss: 
       #force no sample softmax loss, the diff with exact_prob is here we just use cross entropy error as result not real prob of seq
-      #NOTICE for same test as using exact prob above, bout seq sort is diff, loss will be per step, using time a bit less  55 to 57(prob)
+      #NOTICE using time a bit less  55 to 57(prob), same result with exact prob and exact score
       #but 256 vocab sample will use only about 10ms
       #TODO check more with softmax loss and sampled somtmax loss, check length normalize
       loss = melt.seq2seq.sequence_loss_by_example(logits, targets, weights=mask)
