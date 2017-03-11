@@ -72,8 +72,9 @@ def predict(predictor, input_text):
 def main(_):
   text2ids.init()
   predictor = melt.Predictor(FLAGS.model_dir)
-  predict(predictor, "王凯整容了吗_王凯整容前后对比照片")
+  
   predict(predictor, "任达华传授刘德华女儿经 赞停工陪太太(图)")
+  predict(predictor, "王凯整容了吗_王凯整容前后对比照片")
   predict(predictor, "大小通吃汉白玉霸王貔貅摆件 正品开光镇宅招财")
   predict(predictor, "学生迟到遭老师打 扇耳光揪头发把头往墙撞致3人住院")
   predict(predictor, "包邮买二送一性感女内裤低腰诱惑透视蕾丝露臀大蝴蝶三角内裤女夏-淘宝网")

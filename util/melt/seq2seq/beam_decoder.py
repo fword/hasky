@@ -66,7 +66,7 @@ def rnn_decoder(decoder_inputs, initial_state, cell, loop_function=None,
 
 def beam_decode(input, max_steps, initial_state, cell, loop_function, scope=None,
                 beam_size=7, done_token=0, 
-                output_projection=None,  length_normalization_factor=1.0,
+                output_projection=None,  length_normalization_factor=0.,
                 prob_as_score=True, topn=1, 
                 attention_construct_fn=None, attention_keys=None, attention_values=None):
     """
@@ -133,7 +133,7 @@ def beam_decode(input, max_steps, initial_state, cell, loop_function, scope=None
 import tensorflow as tf
 def dynamic_beam_decode(input, max_steps, initial_state, cell, embedding, scope=None,
                 beam_size=7, done_token=0, num_classes=None,
-                output_projection=None,  length_normalization_factor=1.0,
+                output_projection=None,  length_normalization_factor=0.,
                 prob_as_score=True, topn=1):
     """
     Beam search decoder
@@ -230,10 +230,14 @@ def _init_attention(encoder_state):
 
   return attn
 
+#TODO FIXME here may have some bugs, since inference compare with exact_prob calc for some seq -> seq the score diff
+#Will implement out graph interactive one comprare and check result and performance
+#now without beam size 10, about seq->seq 20->4 10w vocab, about 70-100ms, notice the first decode will be slow 400ms+
+#exp in deepiu/textsum/inference/infenrence.sh
 class BeamDecoder():
   def __init__(self, input, max_steps, initial_state, beam_size=7, done_token=0,
               batch_size=None, num_classes=None, output_projection=None, 
-              length_normalization_factor=1.0, topn=1,
+              length_normalization_factor=0., topn=1,
               attention_construct_fn=None, attention_keys=None, attention_values=None):
     self.length_normalization_factor = length_normalization_factor
     self.topn = topn

@@ -52,14 +52,34 @@ def predict(predictor, input_text, text):
   print(text2ids.ids2text(word_ids))
 
   timer = gezi.Timer()
+  score = predictor.inference(['score'], 
+                                    feed_dict= {
+                                      'seq2seq/model_init_1/input_text:0': [input_word_ids],
+                                      'seq2seq/run/text:0': [word_ids]
+                                      })
+  
+  print('score:', score)
+  print('calc score time(ms):', timer.elapsed_ms())
+
+  timer = gezi.Timer()
   exact_score = predictor.inference(['exact_score'], 
                                     feed_dict= {
                                       'seq2seq/model_init_1/input_text:0': [input_word_ids],
-                                      'seq2seq/run/text_1:0': [word_ids]
+                                      'seq2seq/run/text:0': [word_ids]
                                       })
   
   print('exact_score:', exact_score)
   print('calc score time(ms):', timer.elapsed_ms())
+
+  timer = gezi.Timer()
+  exact_prob = predictor.inference(['exact_prob'], 
+                                    feed_dict= {
+                                      'seq2seq/model_init_1/input_text:0': [input_word_ids],
+                                      'seq2seq/run/text:0': [word_ids]
+                                      })
+  
+  print('exact_prob:', exact_prob)
+  print('calc prob time(ms):', timer.elapsed_ms())
 
 def main(_):
   text2ids.init()
@@ -74,6 +94,8 @@ def main(_):
   predict(predictor, '大棚辣椒果实变小怎么办,大棚辣椒果实变小防治措施', '小辣椒图片')
   predict(predictor, '大棚辣椒果实变小怎么办,大棚辣椒果实变小防治措施', '辣椒')
   predict(predictor, '大棚辣椒果实变小怎么办,大棚辣椒果实变小防治措施', '小辣椒')
+  predict(predictor, '大棚辣椒果实变小怎么办,大棚辣椒果实变小防治措施', '辣椒辣椒')
+  predict(predictor, '大棚辣椒果实变小怎么办,大棚辣椒果实变小防治措施', '辣椒小辣椒')
 
 if __name__ == '__main__':
   tf.app.run()

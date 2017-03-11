@@ -26,7 +26,10 @@ from tensorflow.python.ops import rnn
 from tensorflow.python.ops import variable_scope
 from tensorflow.python.util import nest 
   
-#-----------------------loss
+#-----------------------loss 
+# if use tf.contrib.seq2seq.sequence_loss(which is per example if set average_across_batch=False) 
+# notice the main diff here is we do  targets = array_ops.reshape(targets, [-1, 1]) 
+#so in sample soft max  you do not need to do reshape  labels = tf.reshape(labels, [-1, 1])
 def sequence_loss_by_example(logits, targets, weights,
                              average_across_timesteps=True,
                              softmax_loss_function=None, name=None):
@@ -48,19 +51,21 @@ def sequence_loss_by_example(logits, targets, weights,
   """
   with ops.name_scope(name, "sequence_loss_by_example",
                       [logits, targets, weights]):
+    logits_shape = array_ops.shape(logits)
+    batch_size = logits_shape[0]
     if softmax_loss_function is None:
       #croosents [batch_size, num_steps]
+      num_classes = logits_shape[-1]
+      logits = array_ops.reshape(logits, [-1, num_classes])
+      targets = array_ops.reshape(targets, [-1])
       crossents = nn_ops.sparse_softmax_cross_entropy_with_logits(logits=logits, labels=targets)
     else:
-      logits_shape = array_ops.shape(logits)
-      batch_size = logits_shape[0]
       emb_dim = logits_shape[-1]
       #need reshape because unlike sparse_softmax_cross_entropy_with_logits, 
       #tf.nn.sampled_softmax_loss now only accept 2d [batch_size, dim] as logits input
       logits = array_ops.reshape(logits, [-1, emb_dim])
       targets = array_ops.reshape(targets, [-1, 1])
       #croosents [batch_size * num_steps]
-
       crossents = softmax_loss_function(logits, targets)
       # croosents [batch_size, num_steps]
       crossents = array_ops.reshape(crossents, [batch_size, -1])
@@ -111,26 +116,21 @@ def sequence_loss(logits,
     else:
       return cost
 
-
-#sample loss must be None
 import tensorflow as tf  
 import melt
-def exact_predict_loss(logits, targets, mask, batch_size, num_steps):
-  #logits = tf.reshape(logits, [batch_size, -1, self.vocab_size])
+#sample loss must be None
+def exact_predict_loss(logits, targets, mask, num_steps, batch_size=None):
+  if batch_size is None:
+    batch_size = tf.shape(logits)[0]
   i = tf.constant(0, dtype=tf.int32)
   condition = lambda i, log_probs: tf.less(i, num_steps)
   log_probs = tf.zeros([batch_size,], dtype=tf.float32)
   def body(i, log_probs):
-    #-----below only ok in tf11.0 which can index by tensor TODO
-    #step_logits = y[i, :, :]
-    step_logits = tf.squeeze(tf.slice(logits, [0, i, 0], [-1, 1, -1]), [1])
+    step_logits = logits[:, i, :]
     step_probs = tf.nn.softmax(step_logits)
-    #step_targets = targets[i]
-    step_targets = tf.squeeze(tf.slice(targets, [0, i], [-1, 1]), [1])
+    step_targets = targets[:, i]
     selected_probs = melt.dynamic_gather2d(step_probs, step_targets)
     selected_log_probs = tf.log(tf.maximum(selected_probs, 1e-12))
-    #step_mask = mask[:, i]
-    #----FIXME
     step_mask = tf.squeeze(tf.slice(mask, [0, i], [-1, 1]), [1])
     log_probs += selected_log_probs * step_mask
     return tf.add(i, 1), tf.reshape(log_probs, [batch_size,])

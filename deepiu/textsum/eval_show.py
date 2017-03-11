@@ -55,7 +55,7 @@ def deal_eval_generated_texts_results(results):
                                       evaluate_text[i], 
                                       generated_texts[i], generated_texts_score[i],
                                       generated_texts_beam[i], generated_texts_score_beam[i])
-  melt.print_results(results, ['loss'])
+  melt.print_results(results, ['eval_loss'])
 
 def gen_eval_generated_texts_ops(input_app, input_results, predictor, eval_scores):
   #need distinct_texts.npy distinct_text_strs.npy

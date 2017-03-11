@@ -34,7 +34,8 @@ flags.DEFINE_boolean('predict_with_end_mark', True, """if predict with </S> end 
 flags.DEFINE_float('length_normalization_factor', 0., """If != 0, a number x such that captions are
         scored by logprob/length^x, rather than logprob. This changes the
         relative scores of captions depending on their lengths. For example, if
-        x > 0 then longer captions will be favored.  see tensorflow/models/im2text""")
+        x > 0 then longer captions will be favored.  see tensorflow/models/im2text
+        by default wil follow im2text set to 0""")
 
 flags.DEFINE_boolean('predict_use_prob', True, 'if True then use exp(logprob) and False will direclty output logprob')
 flags.DEFINE_boolean('predict_no_sample', False, 'if True will use exact loss')
@@ -100,7 +101,10 @@ class RnnDecoder(Decoder):
 
   #for show and tell input is image input feature
   #for textsum input is None, sequence will pad <GO> 
-  def sequence_loss(self, input, sequence, initial_state=None, emb=None):
+  def sequence_loss(self, input, sequence, 
+                    initial_state=None, attention_states=None, 
+                    exact_prob=False, exact_loss=False,
+                    emb=None):
     if emb is None:
       emb = self.emb
     
@@ -132,16 +136,41 @@ class RnnDecoder(Decoder):
     if self.is_predict:
       #---only need when predict, since train input already dynamic length, NOTICE this will improve speed a lot
       num_steps = tf.cast(tf.reduce_max(sequence_length), dtype=tf.int32)
-      sequence = tf.slice(sequence, [0,0], [-1, num_steps])
+      sequence = sequence[:, 0:num_steps]
+      inputs = inputs[:, 0:num_steps, :]
 
-    outputs, state = tf.nn.dynamic_rnn(self.cell, inputs, 
+    if attention_states is None:
+      outputs, state = tf.nn.dynamic_rnn(self.cell, inputs, 
                                        initial_state=state, 
                                        sequence_length=sequence_length,
                                        scope=self.scope)
-    self.final_state = state
+      self.final_state = state
+    else:
+      attention_keys, attention_values, attention_score_fn, attention_construct_fn = \
+        self.prepare_attention(attention_states)
+      decoder_fn_train = melt.seq2seq.attention_decoder_fn_train(
+          encoder_state=state,
+          attention_keys=attention_keys,
+          attention_values=attention_values,
+          attention_score_fn=attention_score_fn,
+          attention_construct_fn=attention_construct_fn)
+      decoder_outputs_train, decoder_state_train, _ = \
+                    melt.seq2seq.dynamic_rnn_decoder(
+                        cell=self.cell,
+                        decoder_fn=decoder_fn_train,
+                        inputs=inputs,
+                        sequence_length=tf.cast(sequence_length, tf.int32),
+                        scope=self.scope)
+      outputs = decoder_outputs_train
+
+      self.final_state = decoder_state_train
     
     #TODO: hack here add FLAGS.predict_no_sample just for Seq2seqPredictor exact_predict
-    if self.softmax_loss_function is None or FLAGS.predict_no_sample:
+    softmax_loss_function = self.softmax_loss_function
+    if self.is_predict and (exact_prob or exact_loss):
+      softmax_loss_function = None
+
+    if softmax_loss_function is None:
       #[batch_size, num_steps, num_units] * [num_units, vocab_size] -> logits [batch_size, num_steps, vocab_size]
       logits = melt.batch_matmul_embedding(outputs, self.w) + self.v
     else:
@@ -151,20 +180,28 @@ class RnnDecoder(Decoder):
     targets = sequence
     mask = tf.cast(tf.sign(sequence), dtype=tf.float32)
     
-    if self.is_predict and FLAGS.predict_no_sample:
-      loss = melt.seq2seq.exact_predict_loss(logits, targets, mask, batch_size, num_steps)
+    if self.is_predict and exact_prob:
+      #generate real prob for sequence
+      #for 10w vocab textsum seq2seq 20 -> 4 about 
+      loss = melt.seq2seq.exact_predict_loss(logits, targets, mask, num_steps, batch_size)
+    elif self.is_predict and exact_loss: 
+      #force no sample softmax loss, the diff with exact_prob is here we just use cross entropy error as result not real prob of seq
+      #NOTICE for same test as using exact prob above, bout seq sort is diff, loss will be per step, using time a bit less  55 to 57(prob)
+      #but 256 vocab sample will use only about 10ms
+      #TODO check more with softmax loss and sampled somtmax loss, check length normalize
+      loss = melt.seq2seq.sequence_loss_by_example(logits, targets, weights=mask)
     else:
       #loss [batch_size,] 
       loss = melt.seq2seq.sequence_loss_by_example(
           logits,
           targets,
           weights=mask,
-          softmax_loss_function=self.softmax_loss_function)
+          softmax_loss_function=softmax_loss_function)
     
     #mainly for compat with [bach_size, num_losses]
     loss = tf.reshape(loss, [-1, 1])
     if self.is_predict:
-      loss = self.normalize_length(loss, sequence_length)
+      loss = self.normalize_length(loss, sequence_length, exact_prob)
  
     return loss
 
@@ -176,86 +213,6 @@ class RnnDecoder(Decoder):
     attention_keys, attention_values, attention_score_fn, attention_construct_fn = \
        melt.seq2seq.prepare_attention(attention_states, attention_option, self.num_units)
     return attention_keys, attention_values, attention_score_fn, attention_construct_fn
-
-  def sequence_loss_with_attention(self, input, sequence, attention_states, initial_state=None,  emb=None):
-    if emb is None:
-      emb = self.emb
-
-    is_training = self.is_training
-    batch_size = tf.shape(sequence)[0]
-
-    sequence, sequence_length = melt.pad(sequence,
-                                     start_id=self.get_start_id(),
-                                     end_id=self.get_end_id())
-
-    #TODO different init state as show in ptb_word_lm
-    state = self.cell.zero_state(batch_size, tf.float32) if initial_state is None else initial_state
-
-    #[batch_size, num_steps - 1, emb_dim], remove last col
-    inputs = tf.nn.embedding_lookup(emb, melt.dynamic_exclude_last_col(sequence))
-    
-    if is_training and FLAGS.keep_prob < 1:
-      inputs = tf.nn.dropout(inputs, FLAGS.keep_prob)
-    
-    #inputs[batch_size, num_steps, emb_dim] input([batch_size, emb_dim] -> [batch_size, 1, emb_dim]) before concat
-    if input is not None:
-      #used like showandtell where image_emb is as input, additional to sequence
-      inputs = tf.concat(1, [tf.expand_dims(input, 1), inputs])
-    else:
-      #common usage input is None, sequence as input, notice already pad <GO> before using melt.pad
-      sequence_length -= 1
-      sequence = sequence[:, 1:]
-    
-    if self.is_predict:
-      #---only need when predict, since train input already dynamic length, NOTICE this will improve speed a lot
-      num_steps = tf.cast(tf.reduce_max(sequence_length), dtype=tf.int32)
-      sequence = tf.slice(sequence, [0,0], [-1, num_steps])
-
-    attention_keys, attention_values, attention_score_fn, attention_construct_fn = \
-      self.prepare_attention(attention_states)
-    decoder_fn_train = melt.seq2seq.attention_decoder_fn_train(
-        encoder_state=state,
-        attention_keys=attention_keys,
-        attention_values=attention_values,
-        attention_score_fn=attention_score_fn,
-        attention_construct_fn=attention_construct_fn)
-    decoder_outputs_train, decoder_state_train, _ = \
-                  melt.seq2seq.dynamic_rnn_decoder(
-                      cell=self.cell,
-                      decoder_fn=decoder_fn_train,
-                      inputs=inputs,
-                      sequence_length=tf.cast(sequence_length, tf.int32),
-                      scope=self.scope)
-    outputs = decoder_outputs_train
-
-    self.final_state = decoder_state_train
-    
-    if self.softmax_loss_function is None or FLAGS.predict_no_sample:
-      #[batch_size, num_steps, num_units] * [num_units, vocab_size] -> logits [batch_size, num_steps, vocab_size]
-      logits = melt.batch_matmul_embedding(outputs, self.w) + self.v
-    else:
-      logits = outputs
-
-    #[batch_size, num_steps]
-    targets = sequence
-    mask = tf.cast(tf.sign(sequence), dtype=tf.float32)
-    
-    if self.is_predict and FLAGS.predict_no_sample:
-      loss = melt.seq2seq.exact_predict_loss(logits, targets, mask, batch_size, num_steps)
-    else:
-      #loss [batch_size,] 
-      loss = melt.seq2seq.sequence_loss_by_example(
-          logits,
-          targets,
-          weights=mask,
-          softmax_loss_function=self.softmax_loss_function)
-    
-    #mainly for compat with [bach_size, num_losses]
-    loss = tf.reshape(loss, [-1, 1])
-    if self.is_predict:
-      loss = self.normalize_length(loss, sequence_length)
- 
-    return loss
 
   #TODO better, handle, without encoder_output?
   def get_start_input(self, encoder_output):
@@ -269,7 +226,6 @@ class RnnDecoder(Decoder):
     start_input = self.get_start_input(encoder_output)
     start_embedding_input = tf.nn.embedding_lookup(emb, start_input) 
     return start_embedding_input
-
 
   def generate_sequence(self, input, max_steps, initial_state=None, 
                         decode_method=SeqDecodeMethod.greedy, convert_unk=True, 
@@ -358,7 +314,7 @@ class RnnDecoder(Decoder):
     if num_sampled > 0 and num_sampled < vocab_size:
       def sampled_loss(inputs, labels):
         #with tf.device("/cpu:0"):
-        #----move below to melt.seq2seq
+        #---use this since default tf.contrib.seq2seq input labels as [-1], if you use melt.seq2seq.sequence_loss do not need reshape
         #labels = tf.reshape(labels, [-1, 1])
 
         if FLAGS.log_uniform_sample:
@@ -427,9 +383,10 @@ class RnnDecoder(Decoder):
     else:
       return None
 
-  def normalize_length(self, loss, sequence_length):
+  def normalize_length(self, loss, sequence_length, exact_prob=False):
     sequence_length = tf.cast(sequence_length, tf.float32)
-    if not FLAGS.predict_no_sample:
+    #-- below is used when using melt.seq2seq.loss.exact_predict_loss
+    if not exact_prob:
       sequence_length = tf.reshape(sequence_length, [-1, 1])
       loss = loss * sequence_length 
     normalize_factor = tf.pow(sequence_length, FLAGS.length_normalization_factor)
@@ -456,7 +413,7 @@ class RnnDecoder(Decoder):
       return self.end_id
 
   def generate_sequence_by_beam_search(self, input, max_steps, initial_state=None, beam_size=5, 
-                                       convert_unk=True, length_normalization_factor=1.0, emb=None,
+                                       convert_unk=True, length_normalization_factor=0., emb=None,
                                        attention_states=None):
     """
     return top (path, score)

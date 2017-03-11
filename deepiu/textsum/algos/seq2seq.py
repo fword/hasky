@@ -49,20 +49,23 @@ class Seq2seq(object):
     
     print('start_id', self.decoder.start_id)
 
-  def build_graph(self, input_text, text):
+  def build_graph(self, input_text, text, 
+                  exact_prob=False, exact_loss=False):
+    assert not (exact_prob and exact_loss)
     with tf.variable_scope("encode"):
       encoder_output, state = self.encoder.encode(input_text)
     with tf.variable_scope("decode"):
-      #loss = self.decoder.sequence_loss(encoder_output, text, state)
-      #loss = self.decoder.sequence_loss(encoder_output, text, None)
       if not FLAGS.use_attention:
-        loss = self.decoder.sequence_loss(None, text, state)
-      else:
-        loss = self.decoder.sequence_loss_with_attention(None, text, encoder_output, state)
+        encoder_output = None
+      loss = self.decoder.sequence_loss(None, text, state, encoder_output,
+                                        exact_prob=exact_prob, 
+                                        exact_loss=exact_loss)
+
+      #TODO move? now evauate use this 
       tf.add_to_collection('scores', loss)
     
     if not self.is_predict:
-        loss = tf.reduce_mean(loss)
+      loss = tf.reduce_mean(loss)
 
     return loss
 
@@ -73,9 +76,8 @@ class Seq2seqPredictor(Seq2seq, melt.PredictorBase):
   def __init__(self):
     melt.PredictorBase.__init__(self)
     Seq2seq.__init__(self, is_training=False, is_predict=True)
-
-    self.text_list = []
     self.input_text_place = tf.placeholder(tf.int64, [None, INPUT_TEXT_MAX_WORDS], name='input_text')
+    self.text_place = None
 
 
   def init_predict_text(self, decode_method=0, beam_size=5, convert_unk=True):
@@ -90,82 +92,21 @@ class Seq2seqPredictor(Seq2seq, melt.PredictorBase):
                                                 beam_size, 
                                                 convert_unk)
 
-    self.text_list.append(text)
-
     return text, score
 
-  def predict_text(self, input_text, index=0):
-    feed_dict = {
-      self.input_text_place: input_text,
-      }
-
-    #vocab = vocabulary.get_vocab()
-
-    generated_words = self.sess.run(self.text_list[index], feed_dict) 
-    texts = idslist2texts(generated_words)
-
-    return texts
-
-  def init_predict(self, input_text_max_words=INPUT_TEXT_MAX_WORDS, text_max_words=TEXT_MAX_WORDS):
-    self.text_place = tf.placeholder(tf.int64, [None, text_max_words], name='text')
-    self.score = self.build_predict_graph(self.input_text_place, self.text_place, 
-                                          input_text_max_words, text_max_words)
-    return self.score
-
-  def predict(self, input_text, text):
-    """
-    default usage is one single input text, single text predict one sim score
-    """
-    feed_dict = {
-      self.input_text_place: input_text.reshape([-1, INPUT_TEXT_MAX_WORDS]),
-      self.text_place: text.reshape([-1, TEXT_MAX_WORDS]),
-    }
-    score = self.sess.run(self.score, feed_dict)
-    score = score.reshape((len(text),))
+  def init_predict(self, 
+                   input_text_max_words=INPUT_TEXT_MAX_WORDS, 
+                   text_max_words=TEXT_MAX_WORDS,
+                   exact_prob=False,
+                   exact_loss=False):
+    if self.text_place is None:
+      self.text_place = tf.placeholder(tf.int64, [None, text_max_words], name='text')
+    score = self.build_predict_graph(self.input_text_place, self.text_place, 
+                                     input_text_max_words, text_max_words,
+                                     exact_prob=exact_prob, 
+                                     exact_loss=exact_loss)
     return score
 
-  def init_exact_predict(self, input_text_max_words=INPUT_TEXT_MAX_WORDS, text_max_words=TEXT_MAX_WORDS):
-    self.text_place = tf.placeholder(tf.int64, [None, text_max_words], name='text')
-    
-    predict_no_sample = FLAGS.predict_no_sample
-    FLAGS.predict_no_sample = True
-
-    self.exact_score = self.build_predict_graph(self.input_text_place, self.text_place, 
-                                                input_text_max_words, text_max_words)
-    
-    FLAGS.predict_no_sample = predict_no_sample
-
-    return self.exact_score
-
-  def eaxct_predict(self, input_text, text):
-    """
-    default usage is one single input text, single text predict one sim score
-    """
-    feed_dict = {
-      self.input_text_place: input_text.reshape([-1, INPUT_TEXT_MAX_WORDS]),
-      self.text_place: text.reshape([-1, TEXT_MAX_WORDS]),
-    }
-    score = self.sess.run(self.exact_score, feed_dict)
-    score = score.reshape((len(text),))
-    return score
-
-  #TODO why use much mem ? when texts num is large ?
-  #def bulk_predict(self, images, texts, batch_size=100):
-  def bulk_predict(self, input_texts, texts):
-    """
-    input multiple input texts, multiple texts
-    outupt: 
-    
-    image0, text0_score, text1_score ...
-    image1, text0_score, text1_score ...
-    ...
-    """
-    scores = []
-    for input_text in input_texts:
-      stacked_input_texts = np.array([input_text] * len(texts))
-      score = self.predict(stacked_input_texts, texts)
-      scores.append(score)
-    return np.array(scores)
  
   def build_predict_text_graph(self, input_text, decode_method=0, beam_size=5, convert_unk=True):
     with tf.variable_scope("encode"):
@@ -204,11 +145,19 @@ class Seq2seqPredictor(Seq2seq, melt.PredictorBase):
                                                                length_normalization_factor=FLAGS.length_normalization_factor,
                                                                attention_states=encoder_output)
 
-  def build_predict_graph(self, input_text, text, input_text_max_words=INPUT_TEXT_MAX_WORDS, text_max_words=TEXT_MAX_WORDS):
+  def build_predict_graph(self, input_text, text, 
+                          input_text_max_words=INPUT_TEXT_MAX_WORDS, text_max_words=TEXT_MAX_WORDS,
+                          exact_prob=False, exact_loss=False):
     input_text = tf.reshape(input_text, [-1, input_text_max_words])
     text = tf.reshape(text, [-1, text_max_words])
     
-    loss = self.build_graph(input_text, text)
+    loss = self.build_graph(input_text, text, 
+                            exact_prob=exact_prob, 
+                            exact_loss=exact_loss)
+
+    #return loss
+
+    #TODO check this ok both for prob or softmaxloss?
     score = -loss 
     if FLAGS.predict_use_prob:
       score = tf.exp(score)

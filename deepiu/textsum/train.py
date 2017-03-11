@@ -164,11 +164,15 @@ def gen_validate(input_app, input_results, trainer, predictor):
   return eval_ops, None, deal_eval_results
 
 def gen_predict_graph(predictor):  
+  exact_score = predictor.init_predict(exact_loss=True)
+  tf.add_to_collection('exact_score', exact_score)
+
+  exact_prob = predictor.init_predict(exact_prob=True)
+  tf.add_to_collection('exact_prob', exact_prob)
+
+  #put to last since evaluate use get collection from 'scores'[-1]
   score = predictor.init_predict()
   tf.add_to_collection('score', score)
-
-  exact_score = predictor.init_exact_predict()
-  tf.add_to_collection('exact_score', exact_score)
 
   #-----generateive
   text, text_score = predictor.init_predict_text(decode_method=FLAGS.seq_decode_method, 
