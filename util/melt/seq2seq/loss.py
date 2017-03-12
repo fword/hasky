@@ -131,9 +131,94 @@ def exact_predict_loss(logits, targets, mask, num_steps, batch_size=None):
     step_targets = targets[:, i]
     selected_probs = melt.dynamic_gather2d(step_probs, step_targets)
     selected_log_probs = tf.log(tf.maximum(selected_probs, 1e-12))
-    step_mask = tf.squeeze(tf.slice(mask, [0, i], [-1, 1]), [1])
+    step_mask = mask[:, i]
     log_probs += selected_log_probs * step_mask
     return tf.add(i, 1), tf.reshape(log_probs, [batch_size,])
   _, log_probs = tf.while_loop(condition, body, [i, log_probs])
   loss = -log_probs;
   return loss
+
+
+def gen_sampled_softmax_loss_function(num_sampled, vocab_size, 
+                                      weights, biases,
+                                      log_uniform_sample=True,
+                                      is_predict=False,
+                                      sample_seed=None,
+                                      vocabulary=None):
+  #@TODO move to melt  def prepare_sampled_softmax_loss(num_sampled, vocab_size, emb_dim)
+  #return output_projection, softmax_loss_function
+  #also consider candidate sampler 
+  # Sampled softmax only makes sense if we sample less than vocabulary size.
+  # FIMXE seems not work when using meta graph load predic cause segmentaion fault if add not is_predict
+  #if not is_predict and (num_sampled > 0 and num_sampled < vocab_size):
+  if num_sampled > 0 and num_sampled < vocab_size:
+    def sampled_loss(inputs, labels):
+      #with tf.device("/cpu:0"):
+      #---use this since default tf.contrib.seq2seq input labels as [-1], if you use melt.seq2seq.sequence_loss do not need reshape
+      #labels = tf.reshape(labels, [-1, 1])
+
+      if log_uniform_sample:
+        #most likely go here
+        sampled_values = None
+        if is_predict:
+          sampled_values = tf.nn.log_uniform_candidate_sampler(
+            true_classes=labels,
+            num_true=1,
+            num_sampled=num_sampled,
+            unique=True,
+            range_max=vocab_size,
+            seed=sample_seed)
+      else:
+        vocab_counts_list = [vocabulary.vocab.freq(i) for i in xrange(vocab_size)]
+        vocab_counts_list[0] = 1  #  --hack..
+        #vocab_counts_list = [vocabulary.vocab.freq(i) for i in xrange(NUM_RESERVED_IDS, vocab_size)
+        #-------above is ok, do not go here
+        #@TODO find which is better log uniform or unigram sample, what's the diff with full vocab
+        #num_reserved_ids: Optionally some reserved IDs can be added in the range
+        #`[0, num_reserved_ids]` by the users. One use case is that a special
+        #unknown word token is used as ID 0. These IDs will have a sampling
+        #probability of 0.
+        #@TODO seems juse set num_reserved_ids to 1 to ignore pad, will we need to set to 2 to also ignore UNK?
+        #range_max: An `int` that is `>= 1`.
+        #The sampler will sample integers from the interval [0, range_max).
+
+        ##---@FIXME setting num_reserved_ids=NUM_RESERVED_IDS will cause Nan, why...
+        #sampled_values = tf.nn.fixed_unigram_candidate_sampler(
+        #    true_classes=labels,
+        #    num_true=1,
+        #    num_sampled=num_sampled,
+        #    unique=True,
+        #    range_max=vocab_size - NUM_RESERVED_IDS,
+        #    distortion=0.75,
+        #    num_reserved_ids=NUM_RESERVED_IDS,
+        #    unigrams=vocab_counts_list)
+        
+        #FIXME keyword app, now tested on basice 50w,
+        # sample 1000 or other num will cause nan use sampled by count or not by count
+        #flickr data is ok
+        # IMPORTANT to find out reason, data dependent right now
+        #seems ok if using dynamic_batch=1, but seems no speed gain... only 5 instance/s
+        #NOTICE 50w keyword very slow with sample(1w) not speed gain
+        #4GPU will outof mem FIXME  https://github.com/tensorflow/tensorflow/pull/4270
+        #https://github.com/tensorflow/tensorflow/issues/4138
+        sampled_values = tf.nn.fixed_unigram_candidate_sampler(
+            true_classes=labels,
+            num_true=1,
+            num_sampled=num_sampled,
+            unique=True,
+            range_max=vocab_size,
+            distortion=0.75,
+            num_reserved_ids=0,
+            unigrams=vocab_counts_list)
+
+      return tf.nn.sampled_softmax_loss(weights, 
+                                        biases, 
+                                        labels=labels, 
+                                        inputs=inputs, 
+                                        num_sampled=num_sampled, 
+                                        num_classes=vocab_size,
+                                        sampled_values=sampled_values)
+                               
+    return sampled_loss
+  else:
+    return None
