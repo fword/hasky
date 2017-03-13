@@ -49,20 +49,32 @@ class Seq2seq(object):
     
     print('start_id', self.decoder.start_id)
 
+    assert FLAGS.add_text_start is True 
+    assert self.decoder.start_id is not None
+
   def build_graph(self, input_text, text, 
                   exact_prob=False, exact_loss=False):
+    """
+    exact_prob and exact_loss actually do the same thing,
+    they only be used on when is_predict is true
+    """
     assert not (exact_prob and exact_loss)
+    assert not ((not self.is_predict) and (exact_prob or exact_loss))
+
     with tf.variable_scope("encode"):
       encoder_output, state = self.encoder.encode(input_text)
-    with tf.variable_scope("decode"):
       if not FLAGS.use_attention:
         encoder_output = None
-      loss = self.decoder.sequence_loss(None, text, state, encoder_output,
+    with tf.variable_scope("decode"):
+      loss = self.decoder.sequence_loss(None, text, state, 
+                                        attention_states=encoder_output,
                                         exact_prob=exact_prob, 
                                         exact_loss=exact_loss)
 
-      #TODO move? now evauate use this 
-      tf.add_to_collection('scores', loss)
+      #this is used in train.py for evaluate eval_scores = tf.get_collection('scores')[-1]
+      #because we want to show loss for each instance
+      if not self.is_training and not self.is_predict:
+        tf.add_to_collection('scores', loss)
     
     if not self.is_predict:
       loss = tf.reduce_mean(loss)
@@ -76,33 +88,23 @@ class Seq2seqPredictor(Seq2seq, melt.PredictorBase):
   def __init__(self):
     melt.PredictorBase.__init__(self)
     Seq2seq.__init__(self, is_training=False, is_predict=True)
-    self.input_text_place = tf.placeholder(tf.int64, [None, INPUT_TEXT_MAX_WORDS], name='input_text')
-    self.text_place = None
 
+    self.input_text_place = tf.placeholder(tf.int64, [None, INPUT_TEXT_MAX_WORDS], name='input_text')
+    self.text_place = tf.placeholder(tf.int64, [None, TEXT_MAX_WORDS], name='text')
 
   def init_predict_text(self, decode_method=0, beam_size=5, convert_unk=True):
     """
     init for generate texts
     """
-    #@NOTICE if you want differnt graph then self.image_feature_place must in __init__(outside) not here
-    #because it is a shared place holder, if here not, even reuse variable, 
-    #will generate more then 1 place holder, reuse not for placeholder
     text, score = self.build_predict_text_graph(self.input_text_place, 
-                                                decode_method, 
-                                                beam_size, 
-                                                convert_unk)
-
+                                                decode_method=decode_method, 
+                                                beam_size=beam_size, 
+                                                convert_unk=convert_unk)
     return text, score
 
-  def init_predict(self, 
-                   input_text_max_words=INPUT_TEXT_MAX_WORDS, 
-                   text_max_words=TEXT_MAX_WORDS,
-                   exact_prob=False,
-                   exact_loss=False):
-    if self.text_place is None:
-      self.text_place = tf.placeholder(tf.int64, [None, text_max_words], name='text')
-    score = self.build_predict_graph(self.input_text_place, self.text_place, 
-                                     input_text_max_words, text_max_words,
+  def init_predict(self, exact_prob=False, exact_loss=False):
+    score = self.build_predict_graph(self.input_text_place, 
+                                     self.text_place, 
                                      exact_prob=exact_prob, 
                                      exact_loss=exact_loss)
     return score
@@ -111,53 +113,38 @@ class Seq2seqPredictor(Seq2seq, melt.PredictorBase):
   def build_predict_text_graph(self, input_text, decode_method=0, beam_size=5, convert_unk=True):
     with tf.variable_scope("encode"):
       encoder_output, state = self.encoder.encode(input_text)
-    with tf.variable_scope("decode"):
-      #return self.decoder.generate_sequence(encoder_output, TEXT_MAX_WORDS, state, decode_method, beam_size, convert_unk)
-      #return self.decoder.generate_sequence(encoder_output, TEXT_MAX_WORDS, None, decode_method, beam_size, convert_unk)
-      #TODO notice encoder_output here just used to get batch size
-      decoder_input = self.decoder.get_start_embedding_input(encoder_output)
-
       if not FLAGS.use_attention:
-        if decode_method != SeqDecodeMethod.beam_search or not FLAGS.use_beam_search:
-          return self.decoder.generate_sequence(decoder_input, TEXT_MAX_WORDS, state, decode_method, convert_unk)
-        else:
-          return self.decoder.generate_sequence_by_beam_search(decoder_input, 
-                                                               TEXT_MAX_WORDS, 
-                                                               state, 
-                                                               beam_size, 
-                                                               convert_unk,
-                                                               length_normalization_factor=FLAGS.length_normalization_factor)
-      else:
-        #TODO: add beam search support
-        if decode_method != SeqDecodeMethod.beam_search or not FLAGS.use_beam_search:
-          return self.decoder.generate_sequence_with_attention(decoder_input, 
-                                                               TEXT_MAX_WORDS, 
-                                                               encoder_output, 
-                                                               state, 
-                                                               decode_method, 
-                                                               convert_unk)
-        else:
-          return self.decoder.generate_sequence_by_beam_search(decoder_input, 
-                                                               TEXT_MAX_WORDS, 
-                                                               state, 
-                                                               beam_size, 
-                                                               convert_unk,
-                                                               length_normalization_factor=FLAGS.length_normalization_factor,
-                                                               attention_states=encoder_output)
+        encoder_output = None
+    with tf.variable_scope("decode"):
+      #TODO notice encoder_output here just used to get batch size
+      batch_size = tf.shape(input_text)[0]
+      decoder_input = self.decoder.get_start_embedding_input(batch_size)
 
-  def build_predict_graph(self, input_text, text, 
-                          input_text_max_words=INPUT_TEXT_MAX_WORDS, text_max_words=TEXT_MAX_WORDS,
-                          exact_prob=False, exact_loss=False):
-    input_text = tf.reshape(input_text, [-1, input_text_max_words])
-    text = tf.reshape(text, [-1, text_max_words])
-    
+      if decode_method != SeqDecodeMethod.beam_search:
+        return self.decoder.generate_sequence(decoder_input, 
+                                       max_steps=TEXT_MAX_WORDS, 
+                                       initial_state=state,
+                                       attention_states=encoder_output,
+                                       decode_method=decode_method,
+                                       convert_unk=convert_unk)
+      else:
+        return self.decoder.generate_sequence_by_beam_search(decoder_input, 
+                                                       max_steps=TEXT_MAX_WORDS, 
+                                                       initial_state=state,
+                                                       attention_states=encoder_output,
+                                                       beam_size=beam_size, 
+                                                       convert_unk=convert_unk,
+                                                       length_normalization_factor=FLAGS.length_normalization_factor)
+
+  def build_predict_graph(self, input_text, text, exact_prob=False, exact_loss=False):
+    input_text = tf.reshape(input_text, [-1, INPUT_TEXT_MAX_WORDS])
+    text = tf.reshape(text, [-1, TEXT_MAX_WORDS])
+  
+    #loss is -logprob  
     loss = self.build_graph(input_text, text, 
                             exact_prob=exact_prob, 
                             exact_loss=exact_loss)
-
-    #return loss
-
-    #TODO check this ok both for prob or softmaxloss?
+ 
     score = -loss 
     if FLAGS.predict_use_prob:
       score = tf.exp(score)

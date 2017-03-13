@@ -35,31 +35,13 @@ class ShowAndTellPredictor(ShowAndTell, melt.PredictorBase):
     ShowAndTell.__init__(self, is_training=False, is_predict=True)
 
     self.text_list = []
-    ##show show_and_tell/model_init
-    #print('ShowAndTellPredictor init:', tf.get_variable_scope().name)
     self.image_feature_place = tf.placeholder(tf.float32, [None, IMAGE_FEATURE_LEN], name='image_feature')
-    ##show  show_and_tell/model_init_1
-    #print('image_feature_place', self.image_feature_place)
-
-  def restore_from_graph(self):
-    """
-    depreciated, juse use melt.Predictor 
-    if want to restore from graph directly without building predict graph
-    """
-    self.text_list = list(tf.get_collection('text')[0], tf.get_collection('text_beam')[0])
-    ##tensorflow.python.framework.errors.InvalidArgumentError: You must feed a value for placeholder tensor 'show_and_tell/model_init_1/image' with dtype float
-    ##ValueError: Name 'show_and_tell/model_init_1/image:0' appears to refer to a Tensor, not a Operation.
-    #self.image_feature_place = tf.get_default_graph().get_operation_by_name('show_and_tell/model_init_1/image:0').outputs[0]
-    ##placeholder should treat as below, refer to models/image/imagenet of tf
-    self.image_feature_place = 'show_and_tell/model_init_1/image:0'
+    self.text_place = tf.placeholder(tf.int64, [None, TEXT_MAX_WORDS], name='text')
 
   def init_predict_text(self, decode_method=0, beam_size=5, convert_unk=True):
     """
     init for generate texts
     """
-    #@NOTICE if you want differnt graph then self.image_feature_place must in __init__(outside) not here
-    #because it is a shared place holder, if here not, even reuse variable, 
-    #will generate more then 1 place holder, reuse not for placeholder
     text = self.build_predict_text_graph(self.image_feature_place, 
       decode_method, 
       beam_size, 
@@ -71,6 +53,9 @@ class ShowAndTellPredictor(ShowAndTell, melt.PredictorBase):
 
 
   def predict_text(self, images, index=0):
+    """
+    depreciated will remove
+    """
     feed_dict = {
       self.image_feature_place: images,
       }
@@ -82,11 +67,11 @@ class ShowAndTellPredictor(ShowAndTell, melt.PredictorBase):
 
     return texts
 
-  def init_predict(self, text_max_words=TEXT_MAX_WORDS):
-    self.text_place = tf.placeholder(tf.int64, [None, text_max_words], name='text')
-    # TODO try make gpu mem ok
-    #with tf.device('/cpu:0'):
-    self.score = self.build_predict_graph(self.image_feature_place, self.text_place, text_max_words)
+  def init_predict(self, exact_loss=False):
+    self.score = self.build_predict_graph(self.image_feature_place, 
+                                          self.text_place, 
+                                          text_max_words,
+                                          exact_loss=exact_loss)
     return self.score
 
   def predict(self, image, text):
@@ -101,12 +86,6 @@ class ShowAndTellPredictor(ShowAndTell, melt.PredictorBase):
     score = score.reshape((len(text),))
     return score
 
-  # def _bulk_predict(self, image, texts):
-  #   stacked_images = np.array([image] * len(texts))
-  #   score = self.predict(stacked_images, texts)
-
-  #TODO why use much mem ? when texts num is large ?
-  #def bulk_predict(self, images, texts, batch_size=100):
   def bulk_predict(self, images, texts):
     """
     input multiple images, multiple texts
@@ -134,19 +113,23 @@ class ShowAndTellPredictor(ShowAndTell, melt.PredictorBase):
     state = None
     
     if decode_method != SeqDecodeMethod.beam_search:
-      return self.decoder.generate_sequence(decoder_input, TEXT_MAX_WORDS, state, decode_method, convert_unk)
+      return self.decoder.generate_sequence(decoder_input, 
+                                            max_steps=TEXT_MAX_WORDS, 
+                                            initial_state=state, 
+                                            decode_method=decode_method, 
+                                            convert_unk=convert_unk)
     else:
       return self.decoder.generate_sequence_by_beam_search(decoder_input, 
-                                                           TEXT_MAX_WORDS, 
-                                                           state, 
-                                                           beam_size, 
-                                                           convert_unk,
+                                                           max_steps=TEXT_MAX_WORDS, 
+                                                           initial_state=state, 
+                                                           beam_size=beam_size, 
+                                                           convert_unk=convert_unk,
                                                            length_normalization_factor=0.)
 
 
-  def build_predict_graph(self, image, text, text_max_words=TEXT_MAX_WORDS):
+  def build_predict_graph(self, image, text, exact_loss=False):
     image = tf.reshape(image, [-1, IMAGE_FEATURE_LEN])
-    text = tf.reshape(text, [-1, text_max_words])
+    text = tf.reshape(text, [-1, TEXT_MAX_WORDS])
     
     loss = self.build_graph(image, text)
     score = -loss 

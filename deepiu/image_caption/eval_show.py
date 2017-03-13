@@ -61,7 +61,7 @@ def deal_eval_results(results):
     evaluator.print_neareast_texts_from_sorted(eval_max_score[i], eval_max_index[i], img)
     evaluator.print_neareast_words_from_sorted(eval_word_max_score[i], eval_word_max_index[i])
 
-  melt.print_results(results, ['loss'])
+  melt.print_results(results, ['eval_loss'])
 
 
 def gen_eval_show_ops(input_app, input_results, predictor, eval_scores, eval_neg_text, eval_neg_text_str):

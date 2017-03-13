@@ -506,15 +506,17 @@ def dynamic_last(output):
 def static_last(output):
   return output[:, int(output.get_shape()[1]) - 1, :]
 
-#[batch_size, num_steps, emb_dim] * [emb_dim, vocab_size] -> [batch_size, num_steps, vocab_size]
-def batch_matmul_embedding(x, emb):
+#[batch_size, num_steps, emb_dim] * [emb_dim, vocab_size] -> [batch_size, num_steps, vocab_size] if keep_dims
+#else [batch_size * num_steps, vocab_size]
+def batch_matmul_embedding(x, emb, keep_dims=False):
   batch_size = tf.shape(x)[0]
   emb_shape = tf.shape(emb)
   emb_dim = emb_shape[0]
   vocab_size = emb_shape[1]
   x = tf.reshape(x, [-1, emb_dim])
   logits = tf.matmul(x, emb)
-  logits = tf.reshape(logits, [batch_size, -1, vocab_size])
+  if keep_dims:
+    logits = tf.reshape(logits, [batch_size, -1, vocab_size])
   return logits
 
 

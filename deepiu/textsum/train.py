@@ -148,6 +148,7 @@ def gen_validate(input_app, input_results, trainer, predictor):
 
     eval_loss = trainer.build_train_graph(eval_input_text, eval_text)
     eval_scores = tf.get_collection('scores')[-1]
+    print('gen_validate-------------------------', tf.get_collection('scores'))
     eval_ops = [eval_loss]
 
     if FLAGS.show_eval and (predictor is not None):
@@ -235,6 +236,8 @@ def train_process(trainer, predictor=None):
     import conf  
     from conf import TEXT_MAX_WORDS, INPUT_TEXT_MAX_WORDS, NUM_RESERVED_IDS, ENCODE_UNK
 
+    print('-------------------------', tf.get_collection('scores'))
+
     #TODO: now copy from prpare/gen-records.py
     def _text2ids(text, max_words):
       word_ids = text2ids.text2ids(text, 
@@ -247,8 +250,10 @@ def train_process(trainer, predictor=None):
       word_ids = gezi.pad(word_ids, max_words, 0)
       return word_ids
 
-    input_texts = ['包邮买二送一性感女内裤低腰诱惑透视蕾丝露臀大蝴蝶三角内裤女夏-淘宝网',
-                   '大棚辣椒果实变小怎么办,大棚辣椒果实变小防治措施']
+    input_texts = [
+                   #'包邮买二送一性感女内裤低腰诱惑透视蕾丝露臀大蝴蝶三角内裤女夏-淘宝网',
+                   '大棚辣椒果实变小怎么办,大棚辣椒果实变小防治措施'
+                   ]
 
     for input_text in input_texts:
       word_ids = _text2ids(input_text, INPUT_TEXT_MAX_WORDS)

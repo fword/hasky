@@ -21,8 +21,8 @@ FLAGS = flags.FLAGS
 flags.DEFINE_string('model_dir', '/home/gezi/temp/textsum/model.seq2seq/', '')
 flags.DEFINE_string('vocab', '/home/gezi/temp/textsum/tfrecord/seq-basic.10w/train/vocab.txt', 'vocabulary file')
 
-flags.DEFINE_string('input_text_name', 'seq2seq/model_init_1/input_text:0', '')
-flags.DEFINE_string('text_name', 'seq2seq/run/text:0', '')
+flags.DEFINE_string('input_text_name', 'seq2seq/model_init_1/input_text:0', 'model_init_1 because predictor after trainer init')
+flags.DEFINE_string('text_name', 'seq2seq/model_init_1/text:0', '')
 
 import sys, os
 import gezi, melt
@@ -56,7 +56,7 @@ def predict(predictor, input_text, text):
 
   timer = gezi.Timer()
   score = predictor.inference(['score'], 
-                                    feed_dict= {
+                              feed_dict= {
                                       FLAGS.input_text_name: [input_word_ids],
                                       FLAGS.text_name: [word_ids]
                                       })
@@ -87,11 +87,11 @@ def predict(predictor, input_text, text):
 def main(_):
   text2ids.init()
   predictor = melt.Predictor(FLAGS.model_dir)
-  predict(predictor, '包邮买二送一性感女内裤低腰诱惑透视蕾丝露臀大蝴蝶三角内裤女夏-淘宝网', '蕾丝内裤女')
-  predict(predictor, '包邮买二送一性感女内裤低腰诱惑透视蕾丝露臀大蝴蝶三角内裤女夏-淘宝网', '性感内衣')
-  predict(predictor, '包邮买二送一性感女内裤低腰诱惑透视蕾丝露臀大蝴蝶三角内裤女夏-淘宝网', '性感女内裤')
-  predict(predictor, '包邮买二送一性感女内裤低腰诱惑透视蕾丝露臀大蝴蝶三角内裤女夏-淘宝网', '苹果电脑')
-  predict(predictor, '包邮买二送一性感女内裤低腰诱惑透视蕾丝露臀大蝴蝶三角内裤女夏-淘宝网', '性感透明内裤')
+  #predict(predictor, '包邮买二送一性感女内裤低腰诱惑透视蕾丝露臀大蝴蝶三角内裤女夏-淘宝网', '蕾丝内裤女')
+  #predict(predictor, '包邮买二送一性感女内裤低腰诱惑透视蕾丝露臀大蝴蝶三角内裤女夏-淘宝网', '性感内衣')
+  #predict(predictor, '包邮买二送一性感女内裤低腰诱惑透视蕾丝露臀大蝴蝶三角内裤女夏-淘宝网', '性感女内裤')
+  #predict(predictor, '包邮买二送一性感女内裤低腰诱惑透视蕾丝露臀大蝴蝶三角内裤女夏-淘宝网', '苹果电脑')
+  #predict(predictor, '包邮买二送一性感女内裤低腰诱惑透视蕾丝露臀大蝴蝶三角内裤女夏-淘宝网', '性感透明内裤')
   predict(predictor, '大棚辣椒果实变小怎么办,大棚辣椒果实变小防治措施', '蔬菜')
   predict(predictor, '大棚辣椒果实变小怎么办,大棚辣椒果实变小防治措施', '橘子')
   predict(predictor, '大棚辣椒果实变小怎么办,大棚辣椒果实变小防治措施', '辣椒种植')
@@ -100,10 +100,12 @@ def main(_):
   predict(predictor, '大棚辣椒果实变小怎么办,大棚辣椒果实变小防治措施', '小辣椒')
   predict(predictor, '大棚辣椒果实变小怎么办,大棚辣椒果实变小防治措施', '辣椒辣椒')
   predict(predictor, '大棚辣椒果实变小怎么办,大棚辣椒果实变小防治措施', '辣椒小辣椒')
-  predict(predictor, "学生迟到遭老师打 扇耳光揪头发把头往墙撞致3人住院", "女孩")
-  predict(predictor, "学生迟到遭老师打 扇耳光揪头发把头往墙撞致3人住院", "学生")
-  predict(predictor, "学生迟到遭老师打 扇耳光揪头发把头往墙撞致3人住院", "女生学生")
-  predict(predictor, "学生迟到遭老师打 扇耳光揪头发把头往墙撞致3人住院", "女生学术")
+  predict(predictor, '大棚辣椒果实变小怎么办,大棚辣椒果实变小防治措施', '辣椒果实')
+  predict(predictor, '大棚辣椒果实变小怎么办,大棚辣椒果实变小防治措施', '小橘子')
+  #predict(predictor, "学生迟到遭老师打 扇耳光揪头发把头往墙撞致3人住院", "女孩")
+  #predict(predictor, "学生迟到遭老师打 扇耳光揪头发把头往墙撞致3人住院", "学生")
+  #predict(predictor, "学生迟到遭老师打 扇耳光揪头发把头往墙撞致3人住院", "女生学生")
+  #predict(predictor, "学生迟到遭老师打 扇耳光揪头发把头往墙撞致3人住院", "女生学术")
 
 if __name__ == '__main__':
   tf.app.run()

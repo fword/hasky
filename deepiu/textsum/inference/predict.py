@@ -79,10 +79,12 @@ def main(_):
 
   predictor.load(FLAGS.model_dir) 
   #input_text = "王凯整容了吗_王凯整容前后对比照片"
-  input_texts = ['包邮买二送一性感女内裤低腰诱惑透视蕾丝露臀大蝴蝶三角内裤女夏-淘宝网',
-                 '宝宝太胖怎么办呢',
+  input_texts = [
+                 #'包邮买二送一性感女内裤低腰诱惑透视蕾丝露臀大蝴蝶三角内裤女夏-淘宝网',
+                 #'宝宝太胖怎么办呢',
+                 #'蛋龟缸，目前4虎纹1剃刀'
                  '大棚辣椒果实变小怎么办,大棚辣椒果实变小防治措施',
-                 '蛋龟缸，目前4虎纹1剃刀']
+                 ]
 
   for input_text in input_texts:
     word_ids = _text2ids(input_text, INPUT_TEXT_MAX_WORDS)

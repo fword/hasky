@@ -205,6 +205,7 @@ def dynamic_beam_decode(input, max_steps, initial_state, cell, embedding, scope=
       score = tf.exp(score)
     return path, score
 
+#TODO copy from melt.seq2seq.attention_decoder_fn
 def _init_attention(encoder_state):
   """Initialize attention. Handling both LSTM and GRU.
 
@@ -365,7 +366,7 @@ class BeamDecoder():
       (tf.range(self.batch_size * length) // length) * length,
       [self.batch_size, length])
 
-    indice_offsets = indice_offsets[:,0:self.topn]
+    indice_offsets = indice_offsets[:, 0:self.topn]
 
     #[batch_size, max_len(length index) - 2, beam_size, max_len]
     paths = tf.concat(self.paths_list, 1)

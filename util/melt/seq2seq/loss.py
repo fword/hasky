@@ -37,7 +37,9 @@ def sequence_loss_by_example(logits, targets, weights,
 
   Args:
     logits: [batch_size, num_steps, num_decoder_symbols]. 
-            if softmax_loss_function is not None then here is [batch_size, num_steps, emb_dim], actually is just outputs from dynamic_rnn 
+            if softmax_loss_function is not None then here is [batch_size, num_steps, emb_dim], 
+            actually is just outputs from dynamic_rnn 
+            if sotmax_loss_function is None, may be input is already [-1, num_decoder_symbols] flattened anyway, still ok
     targets: [batch_size, num_steps]
     weights: [batch_size, num_steps]
     average_across_timesteps: If set, divide the returned cost by the total
@@ -55,9 +57,10 @@ def sequence_loss_by_example(logits, targets, weights,
     batch_size = logits_shape[0]
     if softmax_loss_function is None:
       #croosents [batch_size, num_steps]
-      num_classes = logits_shape[-1]
-      logits = array_ops.reshape(logits, [-1, num_classes])
-      targets = array_ops.reshape(targets, [-1])
+      #-----do not need to reshape for sparse_softmax_cross_entropy_with_logits accept both input 
+      #num_classes = logits_shape[-1]
+      #logits = array_ops.reshape(logits, [-1, num_classes])
+      #targets = array_ops.reshape(targets, [-1])
       crossents = nn_ops.sparse_softmax_cross_entropy_with_logits(logits=logits, labels=targets)
     else:
       emb_dim = logits_shape[-1]
@@ -118,8 +121,15 @@ def sequence_loss(logits,
 
 import tensorflow as tf  
 import melt
-#sample loss must be None
+
 def exact_predict_loss(logits, targets, mask, num_steps, batch_size=None):
+  """
+  the same as using sparse_softmax_cross_entropy_with_logits 
+  here mainly for debug, comparing experimenting purpose!
+  logits  [batch_size, num_steps, vocab_size]
+  targets [batch_size, num_steps]
+  mast    [batch_size, num_steps]
+  """
   if batch_size is None:
     batch_size = tf.shape(logits)[0]
   i = tf.constant(0, dtype=tf.int32)
@@ -130,6 +140,7 @@ def exact_predict_loss(logits, targets, mask, num_steps, batch_size=None):
     step_probs = tf.nn.softmax(step_logits)
     step_targets = targets[:, i]
     selected_probs = melt.dynamic_gather2d(step_probs, step_targets)
+    #TODO is this ok? or just use tf.nn.log_softmax to replace tf.nn.softmax
     selected_log_probs = tf.log(tf.maximum(selected_probs, 1e-12))
     step_mask = mask[:, i]
     log_probs += selected_log_probs * step_mask

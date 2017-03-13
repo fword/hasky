@@ -20,7 +20,8 @@ flags.DEFINE_integer('num_sampled', 10000, 'num samples of neg word from vocab')
 flags.DEFINE_boolean('log_uniform_sample', True, '')
 
 flags.DEFINE_boolean('add_text_start', False, """if True will add <s> or 0 or GO before text 
-                                              as first input before image, by default will be GO, make add_text_start==True if you use seq2seq""")
+                                              as first input before image, by default will be GO, 
+                                              make sure add_text_start==True if you use seq2seq""")
 flags.DEFINE_boolean('zero_as_text_start', False, """if add_text_start, 
                                                     here True will add 0 False will add <s>
                                                     0 means the loss from image to 0/pad not considered""")
@@ -108,13 +109,16 @@ class RnnDecoder(Decoder):
     if emb is None:
       emb = self.emb 
 
-  #for show and tell input is image input feature
-  #for textsum input is None, sequence will pad <GO> 
-  #TODO since exact_porb and exact_loss same value, will remove exact_prob
+
   def sequence_loss(self, input, sequence, 
                     initial_state=None, attention_states=None, 
                     exact_prob=False, exact_loss=False,
                     emb=None):
+    """
+    for general seq2seq input is None, sequence will pad <GO>, inital_state is last state from encoder
+    for img2text/showandtell input is image_embedding, inital_state is None/zero set
+    TODO since exact_porb and exact_loss same value, may remove exact_prob
+    """
     if emb is None:
       emb = self.emb
     
@@ -180,14 +184,20 @@ class RnnDecoder(Decoder):
     if self.is_predict and (exact_prob or exact_loss):
       softmax_loss_function = None
 
+    #[batch_size, num_steps]
+    targets = sequence
+    
     if softmax_loss_function is None:
-      #[batch_size, num_steps, num_units] * [num_units, vocab_size] -> logits [batch_size, num_steps, vocab_size]
-      logits = melt.batch_matmul_embedding(outputs, self.w) + self.v
+      #[batch_size, num_steps, num_units] * [num_units, vocab_size]
+      # -> logits [batch_size, num_steps, vocab_size] (if use exact_predict_loss)
+      #or [batch_size * num_steps, vocab_size] by default flatten=True
+      keep_dims = exact_prob
+      logits = melt.batch_matmul_embedding(outputs, self.w, keep_dims=keep_dims) + self.v
+      if not keep_dims:
+        targets = tf.reshape(targets, [-1])
     else:
       logits = outputs
 
-    #[batch_size, num_steps]
-    targets = sequence
     mask = tf.cast(tf.sign(sequence), dtype=tf.float32)
     
     if self.is_predict and exact_prob:
@@ -225,21 +235,26 @@ class RnnDecoder(Decoder):
     return attention_keys, attention_values, attention_score_fn, attention_construct_fn
 
   #TODO better, handle, without encoder_output?
-  def get_start_input(self, encoder_output):
-    batch_size = tf.shape(encoder_output)[0]
+  def get_start_input(self, batch_size):
     start_input = melt.constants(self.start_id, [batch_size], tf.int32)
     return start_input
 
-  def get_start_embedding_input(self, encoder_output, emb=None):
+  def get_start_embedding_input(self, batch_size, emb=None):
     if emb is None:
       emb = self.emb
-    start_input = self.get_start_input(encoder_output)
+    start_input = self.get_start_input(batch_size)
     start_embedding_input = tf.nn.embedding_lookup(emb, start_input) 
     return start_embedding_input
 
-  def generate_sequence(self, input, max_steps, initial_state=None, 
-                        decode_method=SeqDecodeMethod.greedy, convert_unk=True, 
+  def generate_sequence(self, input, max_steps, 
+                        initial_state=None, attention_states=None,
+                        decode_method=SeqDecodeMethod.greedy, 
+                        convert_unk=True, 
                         emb=None):
+    """
+    NOTICE decode_method param is unused, only support greedy method right now,
+    for beam search using generate_sequence_by_beam_search with addditional params like beam_size
+    """
     if emb is None:
       emb = self.emb
 
@@ -249,64 +264,39 @@ class RnnDecoder(Decoder):
     def output_fn(output):
       return tf.nn.xw_plus_b(output, self.w, self.v)
 
-    decoder_fn_inference = melt.seq2seq.greedy_decoder_fn_inference(
-                  output_fn=output_fn,
-                  first_input=input,
-                  encoder_state=state,
-                  embeddings=emb,
-                  end_of_sequence_id=self.end_id,
-                  maximum_length=max_steps,
-                  num_decoder_symbols=self.vocab_size,
-                  dtype=tf.int32)
+    if attention_states is None:
+      decoder_fn_inference = melt.seq2seq.greedy_decoder_fn_inference(
+                    output_fn=output_fn,
+                    first_input=input,
+                    encoder_state=state,
+                    embeddings=emb,
+                    end_of_sequence_id=self.end_id,
+                    maximum_length=max_steps,
+                    num_decoder_symbols=self.vocab_size,
+                    dtype=tf.int32)
+    else:
+      attention_keys, attention_values, attention_score_fn, attention_construct_fn = \
+      self.prepare_attention(attention_states)
+      decoder_fn_inference = (
+          melt.seq2seq.attention_decoder_fn_inference(
+              output_fn=output_fn,
+              first_input=input,
+              encoder_state=state,
+              attention_keys=attention_keys,
+              attention_values=attention_values,
+              attention_score_fn=attention_score_fn,
+              attention_construct_fn=attention_construct_fn,
+              embeddings=emb,
+              end_of_sequence_id=self.end_id,
+              maximum_length=max_steps,
+              num_decoder_symbols=self.vocab_size,
+              dtype=tf.int32))
 
     decoder_outputs_inference, decoder_state_inference, decoder_context_state_inference = \
       melt.seq2seq.dynamic_rnn_decoder(
                cell=self.cell,
                decoder_fn=decoder_fn_inference,
                scope=self.scope)
-    
-    generated_sequence = tf.transpose(decoder_context_state_inference.stack(), [1, 0])
-
-    #------like beam search return sequence, score
-    return generated_sequence, tf.zeros([batch_size,])
-
-  #TODO: still has bug FIXME now must evaluate using trainer and eval_show using predictor both with same batch_size, so set smaller eval_batch_size 10 while before set it as 100
-  #or can now set num_evaluate_examples 100  
-  #Why train and evluate with different batch size is ok? both use trainer not predictor
-  def generate_sequence_with_attention(self, input, max_steps, attention_states, 
-                                       initial_state=None, decode_method=SeqDecodeMethod.greedy, 
-                                       convert_unk=True, emb=None):
-    if emb is None:
-      emb = self.emb
-
-    batch_size = tf.shape(input)[0]
-    state = self.cell.zero_state(batch_size, tf.float32) if initial_state is None else initial_state
-    
-    def output_fn(output):
-      return tf.nn.xw_plus_b(output, self.w, self.v)
-
-    attention_keys, attention_values, attention_score_fn, attention_construct_fn = \
-      self.prepare_attention(attention_states)
-    decoder_fn_inference = (
-        melt.seq2seq.attention_decoder_fn_inference(
-            output_fn=output_fn,
-            first_input=input,
-            encoder_state=state,
-            attention_keys=attention_keys,
-            attention_values=attention_values,
-            attention_score_fn=attention_score_fn,
-            attention_construct_fn=attention_construct_fn,
-            embeddings=emb,
-            end_of_sequence_id=self.end_id,
-            maximum_length=max_steps,
-            num_decoder_symbols=self.vocab_size,
-            dtype=tf.int32))
-
-    decoder_outputs_inference, decoder_state_inference, decoder_context_state_inference = \
-        melt.seq2seq.dynamic_rnn_decoder(
-            cell=self.cell,
-            decoder_fn=decoder_fn_inference,
-            scope=self.scope)
     
     generated_sequence = tf.transpose(decoder_context_state_inference.stack(), [1, 0])
 
@@ -342,9 +332,12 @@ class RnnDecoder(Decoder):
     else:
       return self.end_id
 
-  def generate_sequence_by_beam_search(self, input, max_steps, initial_state=None, beam_size=5, 
-                                       convert_unk=True, length_normalization_factor=0., emb=None,
-                                       attention_states=None):
+  def generate_sequence_by_beam_search(self, input, max_steps, 
+                                       initial_state=None, attention_states=None,
+                                       beam_size=5, 
+                                       convert_unk=True, 
+                                       length_normalization_factor=0., 
+                                       emb=None):
     """
     return top (path, score)
     """

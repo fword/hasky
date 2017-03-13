@@ -22,7 +22,8 @@ flags.DEFINE_integer('num_text_topn', 5, '')
 flags.DEFINE_integer('num_word_topn', 50, '')
 
 #---------for rnn decode
-flags.DEFINE_integer('seq_decode_method', 0, 'sequence decode method: 0 max prob, 1 sample, 2 full sample, 3 beam search')
+flags.DEFINE_integer('seq_decode_method', 0, """sequence decode method: 0 greedy, 1 sample, 2 full sample, 3 beam search
+                                                Now only support greedy and beam search""")
 flags.DEFINE_integer('beam_size', 5, 'for seq decode beam search size')
 
 import melt

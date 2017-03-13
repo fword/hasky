@@ -103,13 +103,10 @@ class ShowAndTell(object):
     else:
       return [], []
 
-  def compute_seq_loss(self, image_emb, text):
-    return self.decoder.sequence_loss(image_emb, text)
-
   #NOTICE mainly usage is not use neg! for generative method
-  def build_graph(self, image_feature, text, neg_text=None):
+  def build_graph(self, image_feature, text, neg_text=None, exact_loss=False):
     image_emb = tf.nn.xw_plus_b(image_feature, self.encode_img_W, self.encode_img_b)
-    pos_loss = self.compute_seq_loss(image_emb, text)
+    pos_loss = self.decoder.sequence_loss(image_emb, text, exact_loss=exact_loss)
 
     loss = None
     scores = None
@@ -119,7 +116,7 @@ class ShowAndTell(object):
       for i in xrange(num_negs):
         tf.get_variable_scope().reuse_variables()
         neg_text_i = neg_text[:, i, :]
-        neg_loss = self.compute_seq_loss(image_emb, neg_text_i)
+        neg_loss = self.decoder.sequence_loss(image_emb, neg_text_i, exact_loss=exact_loss)
         neg_losses.append(neg_loss)
 
       neg_losses = tf.concat(1, neg_losses)
@@ -142,7 +139,8 @@ class ShowAndTell(object):
         else:
           scores = pos_loss
 
-    tf.add_to_collection('scores', scores)
+    if not self.is_training and not self.is_predict: #evaluate mode
+      tf.add_to_collection('scores', scores)
     return loss
 
   def build_train_graph(self, image_feature, text, neg_text=None):

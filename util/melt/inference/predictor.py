@@ -58,7 +58,7 @@ class Predictor(object):
   def predict(self, key, feed_dict=None, index=0):
     return self.inference(key, feed_dict, index)
 
-  def restore(self, model_dir, meta_graph=None, model_name=None):
+  def restore(self, model_dir, meta_graph=None, model_name=None, random_seed=None):
     """
     do not need to create graph
     restore graph from meta file then restore values from checkpoint file
@@ -72,5 +72,6 @@ class Predictor(object):
     print('import graph ok %s'%meta_graph, file=sys.stderr)
     saver.restore(self.sess, model_path)
     print('restore ok %s'%model_path, file=sys.stderr)
-    tf.set_random_seed(1024)
+    if random_seed is not None:
+      tf.set_random_seed(random_seed)
     return self.sess

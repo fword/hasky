@@ -40,11 +40,6 @@ flags.DEFINE_string('model_dir', './model', '')
 
 flags.DEFINE_string('algo', 'bow', 'default algo is bow(cbow), also support rnn, show_and_tell, TODO cnn')
 
-flags.DEFINE_boolean('add_global_scope', True, '''default will add global scope as algo name,
-                      set to False incase you want to load some old model without algo scope''')
-
-flags.DEFINE_string('global_scope', '', '')
-
 flags.DEFINE_string('vocab', '/tmp/train/vocab.bin', 'vocabulary binary file')
 
 flags.DEFINE_boolean('debug', False, '')
@@ -65,6 +60,7 @@ from deepiu.image_caption.algos import algos_factory
 from deepiu.util import vocabulary
 from deepiu.util import text2ids
 
+from deepiu.seq2seq.rnn_decoder import SeqDecodeMethod
 
 sess = None
 
@@ -269,12 +265,21 @@ def gen_predict_graph(predictor):
   
    #-----generateive
   if algos_factory.is_generative(FLAGS.algo):
+    exact_score = predictor.init_predict(exact_loss=True)
+    tf.add_to_collection('exact_score', exact_score)
+
     text, text_score = predictor.init_predict_text(decode_method=FLAGS.seq_decode_method, 
                                        beam_size=FLAGS.beam_size,
                                        convert_unk=False)
-      
+    
+    beam_text, beam_text_score = predictor.init_predict_text(decode_method=SeqDecodeMethod.beam_search, 
+                                       beam_size=FLAGS.beam_size,
+                                       convert_unk=False)    
+
     tf.add_to_collection('text', text)
     tf.add_to_collection('text_score', text_score)
+    tf.add_to_collection('beam_text', beam_text)
+    tf.add_to_collection('beam_text_score', beam_text_score)
 
 #step = 0
 def train_process(trainer, predictor=None):

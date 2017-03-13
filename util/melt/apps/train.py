@@ -28,7 +28,7 @@ flags.DEFINE_integer('num_epochs', 0, 'Number of epochs to run trainer.')
 flags.DEFINE_integer('num_steps', 0, 'Number of steps to run trainer.')
 #-------model
 flags.DEFINE_boolean('save_model', True, '')
-flags.DEFINE_float('save_interval_epochs', 1, 'if 0 will not save, by default 1 epoch 1 model in modeldir/epoch, you can change to 2, 0.1 etc')
+flags.DEFINE_float('save_interval_epochs', 0, 'if 0 will not save, by default 1 epoch 1 model in modeldir/epoch, you can change to 2, 0.1 etc')
 flags.DEFINE_float('save_interval_seconds', 0, 'model/checkpoint save interval by n seconds, if > 0 will use this other wise use save_interval_hours')
 flags.DEFINE_float('save_interval_hours', 24, """model/checkpoint save interval by n hours""")
 flags.DEFINE_float('save_interval_steps', 1000, 'model/checkpoint save interval steps')
