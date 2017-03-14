@@ -13,6 +13,7 @@ python ./inference/predict.py \
   --cell lstm_block \
   --emb_dim 1024 \
   --rnn_hidden_size 1024 \
+  --beam_size 20 \
   --add_text_start 1 \
   --rnn_output_method 3 \
   --main_scope run \

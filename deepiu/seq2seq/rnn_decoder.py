@@ -6,7 +6,25 @@
 #          \date   2016-12-24 00:00:05.991481
 #   \Description  
 # ==============================================================================
+"""
+The diff for this RnnDecoder with google im2txt is im2txt assume a start word after image_embedding
+so by doing this im2text or textsum all be the same input is embedding of <start_id> and inital_state
+the first lstm_cell(image_embedding) outputs is discarded just use output_state as inital_state with <start_id>
+so decode process always assume to first start with <start_id>
 
+here we assume showandtell not add this <start_id> by default so image_embedding output assume to be first
+decoded word, image_embedding is the first input ans inital_state is zero_state
+
+#so not check if ok add additinal text start as first input before image...
+
+and decode process always assume to have first_input and inital_state as input
+
+TODO decode functions also accept first_input=None so just treat as im2txt
+by this way general seq2seq also simpler as interactive beam decode start from start_id 
+(input can start from start_id outside graph, not as right now must fetch from ingraph...
+for like image_embedding as input you can not get it from lookup from embedding)  may be better(simpler) design
+but one more train decode step, but since no additional decoding calc softmax not much perf hurt
+"""
   
 from __future__ import absolute_import
 from __future__ import division
@@ -46,6 +64,9 @@ flags.DEFINE_boolean('use_attention', False, 'wether to use attention for decode
 flags.DEFINE_string('attention_option', 'luong', 'luong or bahdanau')
 flags.DEFINE_boolean('use_dynamic_decode', False, 'wether to use dynamic decode')
 
+flags.DEFINE_integer('beam_size', 10, 'for seq decode beam search size')
+
+import functools
 import melt 
 from deepiu.util import vocabulary
 from deepiu.seq2seq.decoder import Decoder
@@ -55,7 +76,8 @@ class SeqDecodeMethod:
   greedy = 0
   sample = 1
   full_sample = 2
-  beam_search = 3
+  beam = 3  # ingraph beam search
+  beam_search = 4  #outgraph beam search/ interactve beam search
 
 class RnnDecoder(Decoder):
   def __init__(self, is_training=True, is_predict=False):
@@ -105,11 +127,6 @@ class RnnDecoder(Decoder):
                                                                                 sample_seed=FLAGS.predict_sample_seed,
                                                                                 vocabulary=vocabulary)
     
-  def prepare_train(self, input, sequence, initial_state=None, emb=None):
-    if emb is None:
-      emb = self.emb 
-
-
   def sequence_loss(self, input, sequence, 
                     initial_state=None, attention_states=None, 
                     exact_prob=False, exact_loss=False,
@@ -225,34 +242,12 @@ class RnnDecoder(Decoder):
  
     return loss
 
-  def prepare_attention(self, attention_states):
-    decoder_hidden_size = self.num_units
-    attention_option = FLAGS.attention_option  # can be "bahdanau"
-    print('attention_option:', attention_option)
-    assert attention_option is "luong" or attention_option is "bahdanau"
-    attention_keys, attention_values, attention_score_fn, attention_construct_fn = \
-       melt.seq2seq.prepare_attention(attention_states, attention_option, self.num_units)
-    return attention_keys, attention_values, attention_score_fn, attention_construct_fn
-
-  #TODO better, handle, without encoder_output?
-  def get_start_input(self, batch_size):
-    start_input = melt.constants(self.start_id, [batch_size], tf.int32)
-    return start_input
-
-  def get_start_embedding_input(self, batch_size, emb=None):
-    if emb is None:
-      emb = self.emb
-    start_input = self.get_start_input(batch_size)
-    start_embedding_input = tf.nn.embedding_lookup(emb, start_input) 
-    return start_embedding_input
-
-  def generate_sequence(self, input, max_steps, 
+  def generate_sequence_greedy(self, input, max_steps, 
                         initial_state=None, attention_states=None,
-                        decode_method=SeqDecodeMethod.greedy, 
                         convert_unk=True, 
                         emb=None):
     """
-    NOTICE decode_method param is unused, only support greedy method right now,
+    this one is using greedy search method
     for beam search using generate_sequence_by_beam_search with addditional params like beam_size
     """
     if emb is None:
@@ -303,6 +298,133 @@ class RnnDecoder(Decoder):
     #------like beam search return sequence, score
     return generated_sequence, tf.zeros([batch_size,])
 
+  def generate_sequence_beam(self, input, max_steps, 
+                             initial_state=None, attention_states=None,
+                             beam_size=5, convert_unk=True,
+                             length_normalization_factor=0., 
+                             emb=None):
+    """
+    beam dcode means ingraph beam search
+    return top (path, score)
+    """
+    if emb is None:
+      emb = self.emb
+
+    def loop_function(prev, i):
+      if isinstance(prev, tuple):
+        prev, attention = prev
+      else:
+        attention = None
+
+      logit_symbols = tf.nn.embedding_lookup(emb, prev)
+      if attention is not None:
+        logit_symbols = tf.concat([logit_symbols, attention], 1)
+      return logit_symbols
+
+    state = self.cell.zero_state(tf.shape(input)[0], tf.float32) if initial_state is None else initial_state
+    
+    #---TODO: dynamic beam decode not ok right now
+    attention_keys, attention_values, attention_score_fn, attention_construct_fn = None, None, None, None
+    if attention_states is not None:
+      attention_keys, attention_values, attention_score_fn, attention_construct_fn = \
+        self.prepare_attention(attention_states)
+
+    #TODO to be safe make topn the same as beam size
+    return melt.seq2seq.beam_decode(input, max_steps, state, 
+                                    self.cell, loop_function, scope=self.scope,
+                                    beam_size=beam_size, done_token=vocabulary.vocab.end_id(), 
+                                    output_projection=(self.w, self.v),
+                                    length_normalization_factor=length_normalization_factor,
+                                    topn=beam_size, 
+                                    attention_construct_fn=attention_construct_fn,
+                                    attention_keys=attention_keys,
+                                    attention_values=attention_values)    
+
+  def generate_sequence_beam_search(self, input, max_steps, 
+                                  initial_state=None, attention_states=None,
+                                  beam_size=10, convert_unk=True,
+                                  length_normalization_factor=0., 
+                                  emb=None):
+    """
+    outgraph beam search, input should be one instance only batch_size=1
+    return top (path, score)
+    TODO add attention support!
+    """
+    if emb is None:
+      emb = self.emb
+
+    beam_search_step = functools.partial(self.beam_search_step, beam_size=beam_size)
+    with tf.variable_scope(self.scope) as scope:
+      initial_state, initial_logprobs, initial_ids = beam_search_step(input, initial_state)
+
+      scope.reuse_variables()
+      # In inference mode, use concatenated states for convenient feeding and
+      # fetching.
+      initial_state = tf.concat(initial_state, 1, name="initial_state")
+      tf.add_to_collection('beam_search_initial_state', initial_state)
+      tf.add_to_collection('beam_search_initial_logprobs', initial_logprobs)
+      tf.add_to_collection('beam_search_initial_ids', initial_ids)
+      tf.add_to_collection('beam_search_beam_size', tf.constant(beam_size))
+
+      input_feed = tf.placeholder(dtype=tf.int64, 
+                                  shape=[None],  # batch_size
+                                  name="input_feed")
+      tf.add_to_collection('beam_search_input_feed', input_feed)
+      #input_seqs = tf.expand_dims(input_feed, 1)
+      #seq_embeddings = tf.nn.embedding_lookup(emb, input_seqs)
+      #input=tf.squeeze(seq_embeddings, squeeze_dims=[1])
+      input = tf.nn.embedding_lookup(emb, input_feed)
+
+      # Placeholder for feeding a batch of concatenated states.
+      state_feed = tf.placeholder(dtype=tf.float32,
+                                  shape=[None, sum(self.cell.state_size)],
+                                  name="state_feed")
+      tf.add_to_collection('beam_search_state_feed', state_feed)
+      state_tuple = tf.split(value=state_feed, num_or_size_splits=2, axis=1)
+      
+      state, top_logprobs, top_ids = beam_search_step(input, state_tuple)
+
+      # Concatentate the resulting state.
+      state = tf.concat(state_tuple, 1, name="state")
+
+      tf.add_to_collection('beam_search_state', state)
+      tf.add_to_collection('beam_search_logprobs', top_logprobs)
+      tf.add_to_collection('beam_search_ids', top_ids)
+
+      #just same return like return path list, score list
+      return tf.no_op(), tf.no_op()
+
+  def beam_search_step(self, input, state, beam_size):
+    outputs, state = self.cell(input, state)
+    
+    logits = tf.nn.xw_plus_b(outputs, self.w, self.v)
+    logprobs = tf.nn.log_softmax(logits)
+
+    top_logprobs, top_ids = tf.nn.top_k(logprobs, beam_size)
+
+    return state, top_logprobs, top_ids
+
+  def prepare_attention(self, attention_states):
+    decoder_hidden_size = self.num_units
+    attention_option = FLAGS.attention_option  # can be "bahdanau"
+    print('attention_option:', attention_option)
+    assert attention_option is "luong" or attention_option is "bahdanau"
+    attention_keys, attention_values, attention_score_fn, attention_construct_fn = \
+       melt.seq2seq.prepare_attention(attention_states, attention_option, self.num_units)
+    return attention_keys, attention_values, attention_score_fn, attention_construct_fn
+
+  #TODO better, handle, without encoder_output?
+  def get_start_input(self, batch_size):
+    start_input = melt.constants(self.start_id, [batch_size], tf.int32)
+    return start_input
+
+  def get_start_embedding_input(self, batch_size, emb=None):
+    if emb is None:
+      emb = self.emb
+    start_input = self.get_start_input(batch_size)
+    start_embedding_input = tf.nn.embedding_lookup(emb, start_input) 
+    return start_embedding_input
+
   def normalize_length(self, loss, sequence_length, exact_prob=False):
     sequence_length = tf.cast(sequence_length, tf.float32)
     #-- below is used when using melt.seq2seq.loss.exact_predict_loss
@@ -332,44 +454,5 @@ class RnnDecoder(Decoder):
     else:
       return self.end_id
 
-  def generate_sequence_by_beam_search(self, input, max_steps, 
-                                       initial_state=None, attention_states=None,
-                                       beam_size=5, 
-                                       convert_unk=True, 
-                                       length_normalization_factor=0., 
-                                       emb=None):
-    """
-    return top (path, score)
-    """
-    if emb is None:
-      emb = self.emb
 
-    def loop_function(prev, i):
-      if isinstance(prev, tuple):
-        prev, attention = prev
-      else:
-        attention = None
-
-      logit_symbols = tf.nn.embedding_lookup(emb, prev)
-      if attention is not None:
-        logit_symbols = tf.concat([logit_symbols, attention], 1)
-      return logit_symbols
-
-    state = self.cell.zero_state(tf.shape(input)[0], tf.float32) if initial_state is None else initial_state
-    
-    #---TODO: dynamic beam decode not ok right now
-    attention_keys, attention_values, attention_score_fn, attention_construct_fn = None, None, None, None
-    if attention_states is not None:
-      attention_keys, attention_values, attention_score_fn, attention_construct_fn = \
-        self.prepare_attention(attention_states)
-
-    return melt.seq2seq.beam_decode(input, max_steps, state, 
-                                    self.cell, loop_function, scope=self.scope,
-                                    beam_size=beam_size, done_token=vocabulary.vocab.end_id(), 
-                                    output_projection=(self.w, self.v),
-                                    length_normalization_factor=length_normalization_factor,
-                                    topn=10, 
-                                    attention_construct_fn=attention_construct_fn,
-                                    attention_keys=attention_keys,
-                                    attention_values=attention_values)    
 

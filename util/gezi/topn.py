@@ -42,6 +42,7 @@ class TopN(object):
 
     The only method that can be called immediately after extract() is reset().
 
+    print(id, logprob)
     Args:
       sort: Whether to return the elements in descending sorted order.
 

@@ -74,6 +74,8 @@ def beam_decode(input, max_steps, initial_state, cell, loop_function, scope=None
     copy from https://gist.github.com/igormq/000add00702f09029ea4c30eba976e0a
     make small modifications, add more comments and add topn support, and 
     length_normalization_factor
+
+    TODO: consider beam search decoder from https://github.com/google/seq2seq
     
     Args:
       decoder_inputs: A list of 2D Tensors [batch_size x input_size].
@@ -172,7 +174,8 @@ def dynamic_beam_decode(input, max_steps, initial_state, cell, embedding, scope=
     assert num_classes is not None
 
     decoder = BeamDecoder(input, max_steps, initial_state, 
-                          done_token=done_token, num_classes=num_classes,
+                          beam_size=beam_size, done_token=done_token, 
+                          num_classes=num_classes,
                           output_projection=output_projection,
                           length_normalization_factor=length_normalization_factor,
                           topn=topn)

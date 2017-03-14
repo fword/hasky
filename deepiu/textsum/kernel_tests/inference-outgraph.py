@@ -48,61 +48,68 @@ def predict(predictor, input_text):
   print(text2ids.ids2text(word_ids))
 
   timer = gezi.Timer()
-  text, score = predictor.inference(['text', 'text_score'], 
-                                    feed_dict= {
-                                      'seq2seq/model_init_1/input_text:0': [word_ids]
-                                      })
-  
-  for result in text:
-    print(result, text2ids.ids2text(result), 'decode time(ms):', timer.elapsed_ms())
-  
+  initial_state, ids, logprobs = predictor.inference([
+                                        'beam_search_initial_state', 
+                                        'beam_search_initial_ids', 
+                                        'beam_search_initial_logprobs'
+                                        ], 
+                                        feed_dict= {
+                                          tf.get_collection('input_text_feed')[0] : [word_ids]
+                                        })
+
+  print('inital_state_shape', np.shape(initial_state))
+  #[1, beam_size]
+  ids = ids[0]
+  logprobs = logprobs[0]
+
+  print(ids, text2ids.ids2text(ids))
+  print('logprob', logprobs)
+  print('prob', [math.exp(x) for x in logprobs])
+  print('inital_state', initial_state[0])
+
+  print('first step using time(ms):', timer.elapsed_ms())
+
   timer = gezi.Timer()
-  texts, scores = predictor.inference(['beam_text', 'beam_text_score'], 
-                                    feed_dict= {
-                                      'seq2seq/model_init_1/input_text:0': [word_ids]
-                                      })
 
-  texts = texts[0]
-  scores = scores[0]
-  for text, score in zip(texts, scores):
-    print(text, text2ids.ids2text(text), score)
+  input_feed = np.array(ids)
+  state_feed = np.array([initial_state[0]] * len(ids))
+  print('input_feed_shape', np.shape(input_feed))
+  print('state_feed_shape', np.shape(state_feed))
+  #state_feed = np.array(initial_state)
 
-  print('beam_search using time(ms):', timer.elapsed_ms())
+  state, ids, logprobs = predictor.inference([
+                                        'beam_search_state', 
+                                        'beam_search_ids', 
+                                        'beam_search_logprobs'
+                                        ], 
+                                        feed_dict= {
+                                          tf.get_collection('beam_search_input_feed')[0] : input_feed,
+                                          tf.get_collection('beam_search_state_feed')[0] : state_feed
+                                        })
+
+  #print(state)
+  print(ids)
+  print(logprobs)
+
+  ids = ids[0]
+  logprobs = logprobs[0]
+
+  print(ids, text2ids.ids2text(ids))
+  print('logprob', logprobs)
+  print('prob', [math.exp(x) for x in logprobs])
+  print('state', state[0])
+
+  print('second step using time(ms):', timer.elapsed_ms())
 
 
-def predicts(predictor, input_texts):
-  word_ids_list = [_text2ids(input_text, INPUT_TEXT_MAX_WORDS) for input_text in input_texts]
-  timer = gezi.Timer()
-  texts_list, scores_list = predictor.inference(['beam_text', 'beam_text_score'], 
-                                    feed_dict= {
-                                      'seq2seq/model_init_1/input_text:0': word_ids_list
-                                      })
-
-  for texts, scores in zip(texts_list, scores_list):
-    for text, score in zip(texts, scores):
-      print(text, text2ids.ids2text(text), score, math.log(score))
-
-  print('beam_search using time(ms):', timer.elapsed_ms())
 
 def main(_):
   text2ids.init()
   predictor = melt.Predictor(FLAGS.model_dir)
   
-  #predict(predictor, "任达华传授刘德华女儿经 赞停工陪太太(图)")
-  #predict(predictor, "王凯整容了吗_王凯整容前后对比照片")
-  #predict(predictor, "大小通吃汉白玉霸王貔貅摆件 正品开光镇宅招财")
-  #predict(predictor, "学生迟到遭老师打 扇耳光揪头发把头往墙撞致3人住院")
   predict(predictor, "宝宝太胖怎么办呢")
   predict(predictor, "包邮买二送一性感女内裤低腰诱惑透视蕾丝露臀大蝴蝶三角内裤女夏-淘宝网")
-  predict(predictor, "蛋龟缸，目前4虎纹1剃刀")
-  #predict(predictor, "大棚辣椒果实变小怎么办,大棚辣椒果实变小防治措施")
-  #predict(predictor, "宝宝太胖怎么办呢")
   predict(predictor, "大棚辣椒果实变小怎么办,大棚辣椒果实变小防治措施")
-
-  predicts(predictor, [
-    "包邮买二送一性感女内裤低腰诱惑透视蕾丝露臀大蝴蝶三角内裤女夏-淘宝网",
-    "大棚辣椒果实变小怎么办,大棚辣椒果实变小防治措施",
-  ])
 
 if __name__ == '__main__':
   tf.app.run()

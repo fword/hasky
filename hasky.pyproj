@@ -214,6 +214,7 @@
     <Compile Include="deepiu\textsum\eval_show.py" />
     <Compile Include="deepiu\textsum\inference.py" />
     <Compile Include="deepiu\textsum\inference\conf.py" />
+    <Compile Include="deepiu\textsum\inference\inference-outgraph.py" />
     <Compile Include="deepiu\textsum\inference\inference-score.py" />
     <Compile Include="deepiu\textsum\inference\inference.py" />
     <Compile Include="deepiu\textsum\inference\predict.py" />
@@ -281,6 +282,7 @@
     <Compile Include="util\melt\seq2seq\attention_decoder_fn.py" />
     <Compile Include="util\melt\seq2seq\beam_decoder.py" />
     <Compile Include="util\melt\seq2seq\beam_decoder_fn.py" />
+    <Compile Include="util\melt\seq2seq\beam_search.py" />
     <Compile Include="util\melt\seq2seq\decoder_fn.py" />
     <Compile Include="util\melt\seq2seq\dynamic_beam_decoder.py" />
     <Compile Include="util\melt\seq2seq\loss.py" />

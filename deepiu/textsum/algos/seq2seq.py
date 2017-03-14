@@ -89,22 +89,24 @@ class Seq2seqPredictor(Seq2seq, melt.PredictorBase):
     melt.PredictorBase.__init__(self)
     Seq2seq.__init__(self, is_training=False, is_predict=True)
 
-    self.input_text_place = tf.placeholder(tf.int64, [None, INPUT_TEXT_MAX_WORDS], name='input_text')
-    self.text_place = tf.placeholder(tf.int64, [None, TEXT_MAX_WORDS], name='text')
+    self.input_text_feed = tf.placeholder(tf.int64, [None, INPUT_TEXT_MAX_WORDS], name='input_text')
+    tf.add_to_collection('input_text_feed', self.input_text_feed)
+    self.text_feed = tf.placeholder(tf.int64, [None, TEXT_MAX_WORDS], name='text')
+    tf.add_to_collection('text_feed', self.text_feed)
 
   def init_predict_text(self, decode_method=0, beam_size=5, convert_unk=True):
     """
     init for generate texts
     """
-    text, score = self.build_predict_text_graph(self.input_text_place, 
+    text, score = self.build_predict_text_graph(self.input_text_feed, 
                                                 decode_method=decode_method, 
                                                 beam_size=beam_size, 
                                                 convert_unk=convert_unk)
     return text, score
 
   def init_predict(self, exact_prob=False, exact_loss=False):
-    score = self.build_predict_graph(self.input_text_place, 
-                                     self.text_place, 
+    score = self.build_predict_graph(self.input_text_feed, 
+                                     self.text_feed, 
                                      exact_prob=exact_prob, 
                                      exact_loss=exact_loss)
     return score
@@ -116,25 +118,29 @@ class Seq2seqPredictor(Seq2seq, melt.PredictorBase):
       if not FLAGS.use_attention:
         encoder_output = None
     with tf.variable_scope("decode"):
-      #TODO notice encoder_output here just used to get batch size
       batch_size = tf.shape(input_text)[0]
       decoder_input = self.decoder.get_start_embedding_input(batch_size)
 
-      if decode_method != SeqDecodeMethod.beam_search:
-        return self.decoder.generate_sequence(decoder_input, 
+      if decode_method == SeqDecodeMethod.greedy:
+        return self.decoder.generate_sequence_greedy(decoder_input, 
                                        max_steps=TEXT_MAX_WORDS, 
                                        initial_state=state,
                                        attention_states=encoder_output,
-                                       decode_method=decode_method,
                                        convert_unk=convert_unk)
       else:
-        return self.decoder.generate_sequence_by_beam_search(decoder_input, 
-                                                       max_steps=TEXT_MAX_WORDS, 
-                                                       initial_state=state,
-                                                       attention_states=encoder_output,
-                                                       beam_size=beam_size, 
-                                                       convert_unk=convert_unk,
-                                                       length_normalization_factor=FLAGS.length_normalization_factor)
+        if decode_method == SeqDecodeMethod.beam:
+          decode_func = self.decoder.generate_sequence_beam
+        elif decode_method == SeqDecodeMethod.beam_search:
+          decode_func = self.decoder.generate_sequence_beam_search
+        else:
+          raise ValueError('not supported decode_method: %d' % decode_method)
+        return decode_func(decoder_input, 
+                           max_steps=TEXT_MAX_WORDS, 
+                           initial_state=state,
+                           attention_states=encoder_output,
+                           beam_size=beam_size, 
+                           convert_unk=convert_unk,
+                           length_normalization_factor=FLAGS.length_normalization_factor)
 
   def build_predict_graph(self, input_text, text, exact_prob=False, exact_loss=False):
     input_text = tf.reshape(input_text, [-1, INPUT_TEXT_MAX_WORDS])

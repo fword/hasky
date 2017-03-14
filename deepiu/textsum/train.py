@@ -47,6 +47,7 @@ flags.DEFINE_boolean('debug', False, '')
 flags.DEFINE_boolean('gen_predict', True, '')
 
 import sys
+import functools
 import gezi
 import melt
 logging = melt.logging
@@ -176,18 +177,20 @@ def gen_predict_graph(predictor):
   tf.add_to_collection('score', score)
 
   #-----generateive
-  text, text_score = predictor.init_predict_text(decode_method=FLAGS.seq_decode_method, 
-                                                 beam_size=FLAGS.beam_size,
-                                                 convert_unk=False)
-  
-  beam_text, beam_text_score = predictor.init_predict_text(decode_method=SeqDecodeMethod.beam_search, 
-                                                           beam_size=FLAGS.beam_size,
-                                                           convert_unk=False)
+  print('--------------beam_size', FLAGS.beam_size)
+  init_predict_text = functools.partial(predictor.init_predict_text, 
+                                        beam_size=FLAGS.beam_size, 
+                                        convert_unk=False)
+  text, text_score = init_predict_text(decode_method=FLAGS.seq_decode_method)
+  beam_text, beam_text_score = init_predict_text(decode_method=SeqDecodeMethod.beam)
       
   tf.add_to_collection('text', text)
   tf.add_to_collection('text_score', text_score)
   tf.add_to_collection('beam_text', beam_text)          
   tf.add_to_collection('beam_text_score', beam_text_score)          
+
+  if not FLAGS.use_attention:
+    init_predict_text(decode_method=SeqDecodeMethod.beam_search)
 
   return beam_text, beam_text_score
 
@@ -265,7 +268,7 @@ def train_process(trainer, predictor=None):
       print(texts[0], text2ids.ids2text(texts[0]), scores[0])
 
       texts, scores = sess.run([beam_text, beam_text_score], 
-                               feed_dict={predictor.input_text_place: [word_ids]})
+                               feed_dict={predictor.input_text_feed: [word_ids]})
 
       texts = texts[0]
       scores = scores[0]

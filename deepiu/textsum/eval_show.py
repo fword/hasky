@@ -22,10 +22,11 @@ flags.DEFINE_integer('num_text_topn', 5, '')
 flags.DEFINE_integer('num_word_topn', 50, '')
 
 #---------for rnn decode
-flags.DEFINE_integer('seq_decode_method', 0, """sequence decode method: 0 greedy, 1 sample, 2 full sample, 3 beam search
+flags.DEFINE_integer('seq_decode_method', 0, """sequence decode method: 0 greedy, 1 sample, 2 full sample, 
+                                                3 beam (beam search ingraph), 4 beam search (outgraph/interactive)
                                                 Now only support greedy and beam search""")
-flags.DEFINE_integer('beam_size', 5, 'for seq decode beam search size')
 
+import functools
 import melt
 from deepiu.image_caption import evaluator
 
@@ -68,17 +69,17 @@ def gen_eval_generated_texts_ops(input_app, input_results, predictor, eval_score
 
   pos_scores = eval_scores[:num_evaluate_examples, 0]
 
-  generated_texts, generated_texts_score = predictor.build_predict_text_graph(
-                      evaluate_input_text, 
-                      decode_method=FLAGS.seq_decode_method, 
-                      beam_size=FLAGS.beam_size,
-                      convert_unk=False)
+  build_predict_text_graph = functools.partial(predictor.build_predict_text_graph,
+                                               input_text=evaluate_input_text, 
+                                               beam_size=FLAGS.beam_size, 
+                                               convert_unk=False)
 
-  generated_texts_beam, generated_texts_score_beam = predictor.build_predict_text_graph(
-                      evaluate_input_text, 
-                      decode_method=SeqDecodeMethod.beam_search,  #beam search
-                      beam_size=FLAGS.beam_size,
-                      convert_unk=False)
+  generated_texts, generated_texts_score = build_predict_text_graph(
+                      decode_method=FLAGS.seq_decode_method)
+
+  #beam search(ingraph)
+  generated_texts_beam, generated_texts_score_beam = build_predict_text_graph(
+                      decode_method=SeqDecodeMethod.beam)
 
   eval_ops = [evaluate_image_name, evaluate_input_text_str, evaluate_input_text, \
               evaluate_text_str, evaluate_text, \

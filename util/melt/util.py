@@ -74,26 +74,16 @@ def tower_losses(loss_function, num_gpus=1, name=''):
   return tower_losses
 
 
-try:
-  rnn_cells = {
-    'lstm' : tf.contrib.rnn.LSTMCell, #LSTMCell is faster then BasicLSTMCell
-    'gru' : tf.contrib.rnn.GRUCell,
-    'lstm_block' : tf.contrib.rnn.LSTMBlockCell, #LSTMBlockCell is faster then LSTMCell
-    }
-except Exception:
-  rnn_cells = {
-    'lstm' : tf.nn.rnn_cell.LSTMCell, #LSTMCell is faster then BasicLSTMCell
-    'gru' : tf.nn.rnn_cell.GRUCell,
-    'lstm_block' : tf.contrib.rnn.LSTMBlockCell, #LSTMBlockCell is faster then LSTMCell
-    }
+rnn_cells = {
+  'lstm' : tf.contrib.rnn.LSTMCell, #LSTMCell is faster then BasicLSTMCell
+  'gru' : tf.contrib.rnn.GRUCell,
+  'lstm_block' : tf.contrib.rnn.LSTMBlockCell, #LSTMBlockCell is faster then LSTMCell
+  }
 
 def create_rnn_cell(num_units, is_training, initializer=None, num_layers=1, keep_prob=1.0, Cell=None, cell_type='lstm', scope=None):
   with tf.variable_scope(scope or 'create_rnn_cell') as scope:
     if Cell is None:
-      try:
-        Cell = rnn_cells.get(cell_type.lower(), tf.contrib.rnn.LSTMCell)
-      except Exception:
-        Cell = rnn_cells.get(cell_type.lower(), tf.nn.rnn_cell.LSTMCell)
+      Cell = rnn_cells.get(cell_type.lower(), tf.contrib.rnn.LSTMCell)
     try:
       #cell = Cell(num_units, initializer=initializer, state_is_tuple=True)
       cell = Cell(num_units, initializer=initializer)

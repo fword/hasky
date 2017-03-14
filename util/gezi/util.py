@@ -15,6 +15,12 @@ import collections
 import sys, os
 import numpy as np
 
+def gen_sum_list(l):
+  l2 = [x for x in l]
+  for i in xrange(1, len(l)):
+    l2[i] += l2[i - 1]
+  return l2
+
 def add_one(d, word):
   if not word in d:
     d[word] = 1

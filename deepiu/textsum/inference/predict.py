@@ -23,7 +23,7 @@ flags.DEFINE_string('algo', 'seq2seq', 'default algo is bow(cbow), also support 
 flags.DEFINE_string('vocab', '/home/gezi/temp/textsum/tfrecord/seq-basic.10w/train/vocab.txt', 'vocabulary file')
 
 #----------strategy 
-flags.DEFINE_integer('beam_size', 10, 'for seq decode beam search size')
+#flags.DEFINE_integer('beam_size', 10, 'for seq decode beam search size')
 
 
 import sys
@@ -73,16 +73,16 @@ def main(_):
                                                 beam_size=FLAGS.beam_size,
                                                 convert_unk=False)   
       scope.reuse_variables()
-      beam_text, beam_score = predictor.init_predict_text(decode_method=SeqDecodeMethod.beam_search, 
+      beam_text, beam_score = predictor.init_predict_text(decode_method=SeqDecodeMethod.beam, 
                                                           beam_size=FLAGS.beam_size,
                                                           convert_unk=False)  
 
   predictor.load(FLAGS.model_dir) 
   #input_text = "王凯整容了吗_王凯整容前后对比照片"
   input_texts = [
-                 #'包邮买二送一性感女内裤低腰诱惑透视蕾丝露臀大蝴蝶三角内裤女夏-淘宝网',
-                 #'宝宝太胖怎么办呢',
-                 #'蛋龟缸，目前4虎纹1剃刀'
+                 '包邮买二送一性感女内裤低腰诱惑透视蕾丝露臀大蝴蝶三角内裤女夏-淘宝网',
+                 '宝宝太胖怎么办呢',
+                 '蛋龟缸，目前4虎纹1剃刀',
                  '大棚辣椒果实变小怎么办,大棚辣椒果实变小防治措施',
                  ]
 
@@ -93,11 +93,11 @@ def main(_):
     print(text2ids.ids2text(word_ids))
 
     timer = gezi.Timer()
-    text_, score_ = sess.run([text, score], {predictor.input_text_place : [word_ids]})
+    text_, score_ = sess.run([text, score], {predictor.input_text_feed : [word_ids]})
     print(text_[0], text2ids.ids2text(text_[0]), score_[0], 'time(ms):', timer.elapsed_ms())
 
     timer = gezi.Timer()
-    texts, scores = sess.run([beam_text, beam_score], {predictor.input_text_place : [word_ids]})
+    texts, scores = sess.run([beam_text, beam_score], {predictor.input_text_feed : [word_ids]})
 
     texts = texts[0]
     scores = scores[0]

@@ -35,7 +35,6 @@ def embedding_lookup(emb, indexes):
                                             combiner=FLAGS.combiner, 
                                             exclude_zero_index=FLAGS.exclude_zero_index)
 
-
 #TODO should add emb_bias?
 def encode(sequence, emb):
   return embedding_lookup(emb, sequence)

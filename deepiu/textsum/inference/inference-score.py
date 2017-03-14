@@ -24,7 +24,7 @@ flags.DEFINE_string('vocab', '/home/gezi/temp/textsum/tfrecord/seq-basic.10w/tra
 flags.DEFINE_string('input_text_name', 'seq2seq/model_init_1/input_text:0', 'model_init_1 because predictor after trainer init')
 flags.DEFINE_string('text_name', 'seq2seq/model_init_1/text:0', '')
 
-import sys, os
+import sys, os, math
 import gezi, melt
 import numpy as np
 
@@ -75,13 +75,17 @@ def predict(predictor, input_text, text):
   print('calc score time(ms):', timer.elapsed_ms())
 
   timer = gezi.Timer()
-  exact_prob = predictor.inference(['exact_prob'], 
+  exact_prob, logprobs = predictor.inference(['exact_prob', 'seq2seq_logprobs'], 
                                     feed_dict= {
                                       FLAGS.input_text_name: [input_word_ids],
                                       FLAGS.text_name: [word_ids]
                                       })
   
-  print('exact_prob:', exact_prob)
+  exact_prob = exact_prob[0]
+  logprobs = logprobs[0]
+  print('exact_prob:', exact_prob, 'ecact_logprob:', math.log(exact_prob))
+  print('logprobs:', logprobs)
+  print('sum_logprobs:', gezi.gen_sum_list(logprobs))
   print('calc prob time(ms):', timer.elapsed_ms())
 
 def main(_):

@@ -91,6 +91,9 @@ class ShowAndTell(object):
       FLAGS.initializer_scale)
     self.encode_img_b = melt.variable.get_bias('encode_img_b', [emb_dim])
 
+    #TODO for safe, can add_text_start but add 0 not calc weight or 
+    #do additional cell(image_embedding, state) and pass state with start_id as input like im2text
+    assert FLAGS.add_text_start is False
 
   def feed_ops(self):
     """

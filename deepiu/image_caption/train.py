@@ -45,6 +45,7 @@ flags.DEFINE_string('vocab', '/tmp/train/vocab.bin', 'vocabulary binary file')
 flags.DEFINE_boolean('debug', False, '')
 
 import sys
+import functools
 import gezi
 import melt
 logging = melt.logging
@@ -268,13 +269,11 @@ def gen_predict_graph(predictor):
     exact_score = predictor.init_predict(exact_loss=True)
     tf.add_to_collection('exact_score', exact_score)
 
-    text, text_score = predictor.init_predict_text(decode_method=FLAGS.seq_decode_method, 
-                                       beam_size=FLAGS.beam_size,
-                                       convert_unk=False)
-    
-    beam_text, beam_text_score = predictor.init_predict_text(decode_method=SeqDecodeMethod.beam_search, 
-                                       beam_size=FLAGS.beam_size,
-                                       convert_unk=False)    
+    init_predict_text = functools.partial(predictor.init_predict_text, 
+                                          beam_size=FLAGS.beam_size, 
+                                          convert_unk=False)
+    text, text_score = init_predict_text(decode_method=FLAGS.seq_decode_method)
+    beam_text, beam_text_score = init_predict_text(decode_method=SeqDecodeMethod.beam)
 
     tf.add_to_collection('text', text)
     tf.add_to_collection('text_score', text_score)

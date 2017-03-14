@@ -43,6 +43,7 @@ python ./train.py \
   --dynamic_batch_length 1 \
   --use_dynamic_decode 0 \
   --rnn_method 0 \
+  --beam_size 20 \
   --add_text_start 1 \
   --rnn_output_method 3 \
   --mode predict \

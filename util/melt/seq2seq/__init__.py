@@ -12,6 +12,6 @@ from melt.seq2seq.attention_decoder_fn import *
 from melt.seq2seq.seq2seq import *
 
 from melt.seq2seq.beam_decoder import *
-#from melt.seq2seq.dynamic_decoder import *
 
-import melt.seq2seq.dynamic_beam_decoder
+from melt.seq2seq.beam_search import *
+

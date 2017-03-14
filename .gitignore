@@ -8,7 +8,8 @@
 *.crc
 *.vshistory
 .localhistory
-.vs
+.vs 
+.vscode
 model.ckpt*
 /data
 /build

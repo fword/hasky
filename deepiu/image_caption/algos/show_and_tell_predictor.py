@@ -51,29 +51,47 @@ class ShowAndTellPredictor(ShowAndTell, melt.PredictorBase):
 
     return text
 
-
-  def predict_text(self, images, index=0):
-    """
-    depreciated will remove
-    """
-    feed_dict = {
-      self.image_feature_place: images,
-      }
-
-    vocab = vocabulary.get_vocab()
-
-    generated_words = self.sess.run(self.text_list[index], feed_dict) 
-    texts = idslist2texts(generated_words)
-
-    return texts
-
   def init_predict(self, exact_loss=False):
     self.score = self.build_predict_graph(self.image_feature_place, 
                                           self.text_place, 
-                                          text_max_words,
                                           exact_loss=exact_loss)
     return self.score
+ 
+  def build_predict_text_graph(self, image, decode_method=0, beam_size=5, convert_unk=True):
+    """
+    @TODO beam search, early stop maybe need c++ op
+    """
+    image_emb = tf.matmul(image, self.encode_img_W) + self.encode_img_b
 
+    decoder_input = image_emb
+    state = None
+    
+    if decode_method == SeqDecodeMethod.greedy:
+      return self.decoder.generate_sequence_greedy(decoder_input, 
+                                            max_steps=TEXT_MAX_WORDS, 
+                                            initial_state=state, 
+                                            convert_unk=convert_unk)
+    elif decode_method == SeqDecodeMethod.beam:
+      return self.decoder.generate_sequence_beam(decoder_input,
+                                                 max_steps=TEXT_MAX_WORDS, 
+                                                 initial_state=state, 
+                                                 beam_size=beam_size, 
+                                                 convert_unk=convert_unk,
+                                                 length_normalization_factor=0.)
+    else:
+      raise ValueError('not supported decode_method: %d' % decode_method)
+
+  def build_predict_graph(self, image, text, exact_loss=False):
+    image = tf.reshape(image, [-1, IMAGE_FEATURE_LEN])
+    text = tf.reshape(text, [-1, TEXT_MAX_WORDS])
+    
+    loss = self.build_graph(image, text)
+    score = -loss 
+    if FLAGS.predict_use_prob:
+      score = tf.exp(score)
+    return score
+
+  #--------------below depreciated, just use melt.predictor for inference
   def predict(self, image, text):
     """
     default usage is one single image , single text predict one sim score
@@ -102,37 +120,18 @@ class ShowAndTellPredictor(ShowAndTell, melt.PredictorBase):
       score = self.predict(stacked_images, texts)
       scores.append(score)
     return np.array(scores)
- 
-  def build_predict_text_graph(self, image, decode_method=0, beam_size=5, convert_unk=True):
+
+  def predict_text(self, images, index=0):
     """
-    @TODO beam search, early stop maybe need c++ op
+    depreciated will remove
     """
-    image_emb = tf.matmul(image, self.encode_img_W) + self.encode_img_b
+    feed_dict = {
+      self.image_feature_place: images,
+      }
 
-    decoder_input = image_emb
-    state = None
-    
-    if decode_method != SeqDecodeMethod.beam_search:
-      return self.decoder.generate_sequence(decoder_input, 
-                                            max_steps=TEXT_MAX_WORDS, 
-                                            initial_state=state, 
-                                            decode_method=decode_method, 
-                                            convert_unk=convert_unk)
-    else:
-      return self.decoder.generate_sequence_by_beam_search(decoder_input, 
-                                                           max_steps=TEXT_MAX_WORDS, 
-                                                           initial_state=state, 
-                                                           beam_size=beam_size, 
-                                                           convert_unk=convert_unk,
-                                                           length_normalization_factor=0.)
+    vocab = vocabulary.get_vocab()
 
+    generated_words = self.sess.run(self.text_list[index], feed_dict) 
+    texts = idslist2texts(generated_words)
 
-  def build_predict_graph(self, image, text, exact_loss=False):
-    image = tf.reshape(image, [-1, IMAGE_FEATURE_LEN])
-    text = tf.reshape(text, [-1, TEXT_MAX_WORDS])
-    
-    loss = self.build_graph(image, text)
-    score = -loss 
-    if FLAGS.predict_use_prob:
-      score = tf.exp(score)
-    return score
+    return texts
