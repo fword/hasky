@@ -10,6 +10,8 @@
 .localhistory
 .vs 
 .vscode
+./vscode/*
+.vs/hasky/v14/.suo 
 model.ckpt*
 /data
 /build
