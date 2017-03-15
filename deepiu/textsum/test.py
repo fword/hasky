@@ -19,12 +19,14 @@ import tensorflow as tf
 flags = tf.app.flags
 FLAGS = flags.FLAGS
 
-flags.DEFINE_string('algo', 'show_and_tell', 'bow rnn show_and_tell')
+flags.DEFINE_string('algo', 'seq2seq', '/home/gezi/temp/textsum/model.seq2seq/')
 flags.DEFINE_string('model_dir', './model.flickr.show_and_tell2/', '')  
-flags.DEFINE_string('vocab', '/home/gezi/temp/image-caption/flickr/seq-with-unk/train/vocab.bin', 'vocabulary binary file')
+flags.DEFINE_string('vocab', '/home/gezi/temp/textsum/tfrecord/seq-basic.10w/train/vocab.txt', 'vocabulary file')
 
 flags.DEFINE_integer('num_interval_steps', 100, '')
 flags.DEFINE_integer('eval_times', 0, '')
+
+flags.DEFINE_integer('monitor_level', 2, '1 will monitor emb, 2 will monitor gradient')
 
 
 import sys

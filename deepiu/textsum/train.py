@@ -46,7 +46,7 @@ flags.DEFINE_string('vocab', '/home/gezi/temp/textsum/tfrecord/seq-basic.10w/tra
 flags.DEFINE_boolean('debug', False, '')
 flags.DEFINE_boolean('gen_predict', True, '')
 
-import sys
+import sys, math
 import functools
 import gezi
 import melt
@@ -168,8 +168,10 @@ def gen_validate(input_app, input_results, trainer, predictor):
 def gen_predict_graph(predictor):  
   exact_score = predictor.init_predict(exact_loss=True)
   tf.add_to_collection('exact_score', exact_score)
+  print('----------exact_score', exact_score)
 
   exact_prob = predictor.init_predict(exact_prob=True)
+  print('----------exact_prob', exact_prob)
   tf.add_to_collection('exact_prob', exact_prob)
 
   #put to last since evaluate use get collection from 'scores'[-1]
@@ -189,8 +191,7 @@ def gen_predict_graph(predictor):
   tf.add_to_collection('beam_text', beam_text)          
   tf.add_to_collection('beam_text_score', beam_text_score)          
 
-  if not FLAGS.use_attention:
-    init_predict_text(decode_method=SeqDecodeMethod.beam_search)
+  init_predict_text(decode_method=SeqDecodeMethod.beam_search)
 
   return beam_text, beam_text_score
 
@@ -255,7 +256,7 @@ def train_process(trainer, predictor=None):
 
     input_texts = [
                    #'包邮买二送一性感女内裤低腰诱惑透视蕾丝露臀大蝴蝶三角内裤女夏-淘宝网',
-                   '大棚辣椒果实变小怎么办,大棚辣椒果实变小防治措施'
+                   '大棚辣椒果实变小怎么办,大棚辣椒果实变小防治措施',
                    ]
 
     for input_text in input_texts:
@@ -274,6 +275,25 @@ def train_process(trainer, predictor=None):
       scores = scores[0]
       for text, score in zip(texts, scores):
         print(text, text2ids.ids2text(text), score)
+    
+    input_texts = [
+                   "宝宝太胖怎么办呢",
+                   '大棚辣椒果实变小怎么办,大棚辣椒果实变小防治措施',
+                   #'大棚辣椒果实变小怎么办,大棚辣椒果实变小防治措施',
+                   '包邮买二送一性感女内裤低腰诱惑透视蕾丝露臀大蝴蝶三角内裤女夏-淘宝网',
+                   '邹红建是阿拉斯加',
+                   ]
+
+    word_ids_list = [_text2ids(input_text, INPUT_TEXT_MAX_WORDS) for input_text in input_texts]
+    timer = gezi.Timer()
+    texts_list, scores_list = sess.run([beam_text, beam_text_score], 
+                               feed_dict={predictor.input_text_feed: word_ids_list})
+    for texts, scores in zip(texts_list, scores_list):
+      for text, score in zip(texts, scores):
+        print(text, text2ids.ids2text(text), score, math.log(score))
+
+    print('beam_search using time(ms):', timer.elapsed_ms())
+
 
 
 def train():

@@ -271,6 +271,8 @@
     <Compile Include="util\melt\layers\optimizers_backward_compat.py" />
     <Compile Include="util\melt\layers\__init__.py" />
     <Compile Include="util\melt\losses\__init__.py" />
+    <Compile Include="util\melt\metrics\rank_metrics.py" />
+    <Compile Include="util\melt\metrics\__init__.py" />
     <Compile Include="util\melt\models\mlp.py" />
     <Compile Include="util\melt\models\__init__.py" />
     <Compile Include="util\melt\ops\ops.py" />
@@ -400,6 +402,7 @@
     <Folder Include="util\melt\inference\" />
     <Folder Include="util\melt\layers\" />
     <Folder Include="util\melt\losses" />
+    <Folder Include="util\melt\metrics\" />
     <Folder Include="util\melt\models\" />
     <Folder Include="util\melt\ops" />
     <Folder Include="util\melt\rnn\" />
@@ -929,6 +932,8 @@
     <Content Include="util\melt\apps\__init__.pyc" />
     <Content Include="util\melt\layers\layers.pyc" />
     <Content Include="util\melt\layers\__init__.pyc" />
+    <Content Include="util\melt\metrics\rank_metrics.pyc" />
+    <Content Include="util\melt\metrics\__init__.pyc" />
     <Content Include="util\melt\rnn\rnn.pyc" />
     <Content Include="util\melt\rnn\__init__.pyc" />
     <Content Include="util\melt\seq2seq\attention_decoder_fn.pyc" />

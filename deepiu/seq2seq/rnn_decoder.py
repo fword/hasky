@@ -62,7 +62,6 @@ flags.DEFINE_integer('predict_sample_seed', 0, '')
 
 flags.DEFINE_boolean('use_attention', False, 'wether to use attention for decoder')
 flags.DEFINE_string('attention_option', 'luong', 'luong or bahdanau')
-flags.DEFINE_boolean('use_dynamic_decode', False, 'wether to use dynamic decode')
 
 flags.DEFINE_integer('beam_size', 10, 'for seq decode beam search size')
 flags.DEFINE_integer('decode_max_words', 0, 'if 0 use TEXT_MAX_WORDS from conf.py otherwise use decode_max_words')
@@ -208,7 +207,7 @@ class RnnDecoder(Decoder):
       #[batch_size, num_steps, num_units] * [num_units, vocab_size]
       # -> logits [batch_size, num_steps, vocab_size] (if use exact_predict_loss)
       #or [batch_size * num_steps, vocab_size] by default flatten=True
-      keep_dims = exact_prob
+      keep_dims = exact_prob or exact_loss
       logits = melt.batch_matmul_embedding(outputs, self.w, keep_dims=keep_dims) + self.v
       if not keep_dims:
         targets = tf.reshape(targets, [-1])
@@ -237,9 +236,9 @@ class RnnDecoder(Decoder):
     
     #mainly for compat with [bach_size, num_losses]
     loss = tf.reshape(loss, [-1, 1])
+
     if self.is_predict:
       loss = self.normalize_length(loss, sequence_length, exact_prob)
- 
     return loss
 
   def generate_sequence_greedy(self, input, max_words, 
@@ -310,16 +309,18 @@ class RnnDecoder(Decoder):
     if emb is None:
       emb = self.emb
 
-    def loop_function(step_result, i):
-      prev, state = step_result
-      if isinstance(prev, tuple):
-        prev, attention = prev
+    def loop_function(i, step_result):
+      if len(step_result) == 3:
+        prev, state, attention = step_result
       else:
+        prev, state = step_result
         attention = None
 
       logit_symbols = tf.nn.embedding_lookup(emb, prev)
       if attention is not None:
         logit_symbols = tf.concat([logit_symbols, attention], 1)
+
+      #logit_symbols is next input
       return logit_symbols, state
 
     state = self.cell.zero_state(tf.shape(input)[0], tf.float32) if initial_state is None else initial_state
@@ -337,6 +338,7 @@ class RnnDecoder(Decoder):
                                     output_projection=(self.w, self.v),
                                     length_normalization_factor=length_normalization_factor,
                                     topn=beam_size, 
+                                    #topn=1,
                                     attention_construct_fn=attention_construct_fn,
                                     attention_keys=attention_keys,
                                     attention_values=attention_values)    
@@ -355,14 +357,41 @@ class RnnDecoder(Decoder):
     if emb is None:
       emb = self.emb
 
-    beam_search_step = functools.partial(self.beam_search_step, beam_size=beam_size)
+    if attention_states is not None:
+       attention_keys, attention_values, attention_score_fn, attention_construct_fn = \
+        self.prepare_attention(attention_states)
+    else:
+       attention_keys, attention_values, attention_score_fn, attention_construct_fn = \
+        None, None, None, None
+
+    beam_search_step = functools.partial(self.beam_search_step, 
+                                         beam_size=beam_size,
+                                         attention_construct_fn=attention_construct_fn,
+                                         attention_keys=attention_keys,
+                                         attention_values=attention_values)
     with tf.variable_scope(self.scope) as scope:
-      initial_state, initial_logprobs, initial_ids = beam_search_step(input, initial_state)
+      if attention_states is not None:
+        inital_attention = melt.seq2seq.init_attention(initial_state)
+        input = tf.concat([input, inital_attention], 1)
+
+      inital_attention, initial_state, initial_logprobs, initial_ids = beam_search_step(input, initial_state)
 
       scope.reuse_variables()
       # In inference mode, use concatenated states for convenient feeding and
       # fetching.
-      initial_state = tf.concat(initial_state, 1, name="initial_state")
+      state_is_tuple = len(initial_state) == 2
+
+      if state_is_tuple:
+        initial_state = tf.concat(initial_state, 1, name="initial_state")
+        state_size = sum(self.cell.state_size)
+      else:
+        state_size = self.cell.state_size
+
+      #output is used only when use attention
+      if attention_states is not None:
+        initial_state = tf.concat([initial_state, inital_attention], 1, name="initial_attention_state")
+        state_size += self.cell.output_size
+
       tf.add_to_collection('beam_search_initial_state', initial_state)
       tf.add_to_collection('beam_search_initial_logprobs', initial_logprobs)
       tf.add_to_collection('beam_search_initial_ids', initial_ids)
@@ -374,17 +403,31 @@ class RnnDecoder(Decoder):
       tf.add_to_collection('beam_search_input_feed', input_feed)
       input = tf.nn.embedding_lookup(emb, input_feed)
 
+
       # Placeholder for feeding a batch of concatenated states.
       state_feed = tf.placeholder(dtype=tf.float32,
-                                  shape=[None, sum(self.cell.state_size)],
+                                  shape=[None, state_size],
                                   name="state_feed")
       tf.add_to_collection('beam_search_state_feed', state_feed)
-      state_tuple = tf.split(value=state_feed, num_or_size_splits=2, axis=1)
-      
-      state_tuple, top_logprobs, top_ids = beam_search_step(input, state_tuple)
 
-      # Concatentate the resulting state.
-      state = tf.concat(state_tuple, 1, name="state")
+      if attention_states is not None:
+        state, attention = tf.split(state_feed, [state_size - self.cell.output_size, self.cell.output_size], axis=1)
+      else:
+        state = state_feed
+
+      if state_is_tuple:
+        state = tf.split(state, num_or_size_splits=2, axis=1)
+
+      if attention_states is not None:
+        input = tf.concat([input, attention], 1)
+      
+      attention, state, top_logprobs, top_ids = beam_search_step(input, state)
+
+      if state_is_tuple:
+        # Concatentate the resulting state.
+        state = tf.concat(state, 1, name="state")
+      if attention_states is not None:
+        state = tf.concat([state, attention], 1, name="attention_state")
 
       tf.add_to_collection('beam_search_state', state)
       tf.add_to_collection('beam_search_logprobs', top_logprobs)
@@ -393,15 +436,25 @@ class RnnDecoder(Decoder):
       #just same return like return path list, score list
       return tf.no_op(), tf.no_op()
 
-  def beam_search_step(self, input, state, beam_size):
-    outputs, state = self.cell(input, state)
+  def beam_search_step(self, input, state, beam_size, 
+                       attention_construct_fn=None,
+                       attention_keys=None,
+                       attention_values=None):
+    output, state = self.cell(input, state)
+
+    #TODO: this step cause.. attenion decode each step after initalization still need input_text feed 
+    #will this case attention_keys and attention_values to be recompute(means redo encoding process) each step?
+    #can we avoid this? seems not better method, 
+    #if enocding is slow may be feed attention_keys, attention_values each step
+    if attention_construct_fn is not None:
+      output = attention_construct_fn(output, attention_keys, attention_values)
     
-    logits = tf.nn.xw_plus_b(outputs, self.w, self.v)
+    logits = tf.nn.xw_plus_b(output, self.w, self.v)
     logprobs = tf.nn.log_softmax(logits)
 
     top_logprobs, top_ids = tf.nn.top_k(logprobs, beam_size)
 
-    return state, top_logprobs, top_ids
+    return output, state, top_logprobs, top_ids
 
   def prepare_attention(self, attention_states):
     decoder_hidden_size = self.num_units
@@ -423,11 +476,14 @@ class RnnDecoder(Decoder):
     start_embedding_input = tf.nn.embedding_lookup(emb, start_input) 
     return start_embedding_input
 
+
   def normalize_length(self, loss, sequence_length, exact_prob=False):
     sequence_length = tf.cast(sequence_length, tf.float32)
+    #NOTICE must check if shape ok, [?,1] / [?,] will get [?,?]
+    sequence_length = tf.reshape(sequence_length, [-1, 1])
     #-- below is used only when using melt.seq2seq.loss.exact_predict_loss
     if not exact_prob:
-      sequence_length = tf.reshape(sequence_length, [-1, 1])
+      #use sequence_loss_by_example with default average_across_timesteps=True, so we just turn it back
       loss = loss * sequence_length 
     normalize_factor = tf.pow(sequence_length, FLAGS.length_normalization_factor)
     loss /= normalize_factor  

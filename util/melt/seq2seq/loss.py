@@ -164,7 +164,7 @@ def exact_predict_loss(logits, targets, mask, num_steps, batch_size=None):
   log_probs_list = tf.transpose(log_probs_list.stack(), [1, 0])
   tf.add_to_collection('seq2seq_logprobs', log_probs_list)
 
-  loss = -log_probs;
+  loss = -log_probs
   return loss
 
 def gen_sampled_softmax_loss_function(num_sampled, vocab_size, 

@@ -88,6 +88,52 @@ def predict(predictor, input_text, text):
   print('sum_logprobs:', gezi.gen_sum_list(logprobs))
   print('calc prob time(ms):', timer.elapsed_ms())
 
+
+def predicts(predictor, input_texts, texts):
+  input_word_ids_list = [_text2ids(input_text, INPUT_TEXT_MAX_WORDS) for input_text in input_texts]
+  word_ids_list = [_text2ids(text, INPUT_TEXT_MAX_WORDS) for text in texts]
+
+  print(input_word_ids_list)
+  print(word_ids_list)
+
+  timer = gezi.Timer()
+  score = predictor.inference(['score'], 
+                              feed_dict= {
+                                      FLAGS.input_text_name: input_word_ids_list,
+                                      FLAGS.text_name: word_ids_list
+                                      })
+  
+  print('score:', score)
+  print('calc score time(ms):', timer.elapsed_ms())
+
+  #TODO FIXME not work...  Incompatible shapes: [8] vs. [2,4]
+  timer = gezi.Timer()
+  exact_score = predictor.inference(['exact_score'], 
+                                    feed_dict= {
+                                      FLAGS.input_text_name: input_word_ids_list,
+                                      FLAGS.text_name: word_ids_list
+                                      })
+  
+  print('exact_score:', exact_score)
+  print('calc score time(ms):', timer.elapsed_ms())
+
+  timer = gezi.Timer()
+
+  exact_prob, logprobs = predictor.inference(['exact_prob', 'seq2seq_logprobs'], 
+                                    feed_dict= {
+                                      FLAGS.input_text_name: input_word_ids_list,
+                                      FLAGS.text_name: word_ids_list
+                                      })
+  
+  print(exact_prob)
+  print(logprobs)
+  #print('exact_prob:', exact_prob, 'ecact_logprob:', math.log(exact_prob))
+  #print('logprobs:', logprobs)
+  #print('sum_logprobs:', gezi.gen_sum_list(logprobs))
+  print('calc prob time(ms):', timer.elapsed_ms())
+
+
+
 def main(_):
   text2ids.init()
   predictor = melt.Predictor(FLAGS.model_dir)
@@ -111,5 +157,8 @@ def main(_):
   #predict(predictor, "学生迟到遭老师打 扇耳光揪头发把头往墙撞致3人住院", "女生学生")
   #predict(predictor, "学生迟到遭老师打 扇耳光揪头发把头往墙撞致3人住院", "女生学术")
 
+  predicts(predictor, 
+           ['包邮买二送一性感女内裤低腰诱惑透视蕾丝露臀大蝴蝶三角内裤女夏-淘宝网', '大棚辣椒果实变小怎么办,大棚辣椒果实变小防治措施'],
+           ['蕾丝内裤女', '辣椒种植'])
 if __name__ == '__main__':
   tf.app.run()

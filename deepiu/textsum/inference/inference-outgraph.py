@@ -65,6 +65,10 @@ def predict(predictor, input_text):
                                         'beam_search_logprobs'
                                         ], 
                                         feed_dict= {
+                                          #TODO...attetion still need input_text feed, see rnn_decoder.py  beam_search_step
+                                          #but not hurt perfomance much because encoder is fast? Is it possible to avoid this?
+                                          #anyway if no attention  will not need input_text_feed
+                                          tf.get_collection('input_text_feed')[0] : [word_ids],
                                           tf.get_collection('beam_search_input_feed')[0] : input_feed,
                                           tf.get_collection('beam_search_state_feed')[0] : state_feed
                                         })

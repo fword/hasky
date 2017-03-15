@@ -43,6 +43,8 @@ python ./train.py \
   --feed_single $feed_single \
   --seq_decode_method 0 \
   --dynamic_batch_length 1 \
+  --beam_size 10 \
+  --decode_max_words 10 \
   --rnn_method 0 \
   --emb_dim 1000 \
   --rnn_hidden_size 1023 \

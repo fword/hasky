@@ -175,12 +175,12 @@ def print_neareast_texts(scores, num=20, img = None):
   indexes = (-scores).argsort()[:num]
   for i, index in enumerate(indexes):
     used_words = ids2words(all_distinct_texts[index])
-    line = ' '.join([str(x) for x in ['%d:['%i,all_distinct_text_strs[index], ']', "%.4f"%scores[index], len(used_words), '/'.join(used_words)]])
+    line = ' '.join([str(x) for x in ['%d:['%i,all_distinct_text_strs[index], ']', "%.6f"%scores[index], len(used_words), '/'.join(used_words)]])
     logging.info(content_html.format(line))
 
 def print_neareast_words(scores, num=50):
   indexes = (-scores).argsort()[:num]
-  line = ' '.join(['%s:%.4f'%(vocab.key(index), scores[index]) for index in indexes])
+  line = ' '.join(['%s:%.6f'%(vocab.key(index), scores[index]) for index in indexes])
   logging.info(content_html.format(line))
 
 def print_neareast_texts_from_sorted(scores, indexes, img = None):
@@ -195,16 +195,16 @@ def print_neareast_texts_from_sorted(scores, indexes, img = None):
         predict_result = 'un@%d'%i 
     #notice may introduce error, offline scores is orinal scores! so need scores[index] but online input is max_scores will need scores[i]
     if len(scores) == len(indexes):
-      line = ' '.join([str(x) for x in [predict_result, '[', all_distinct_text_strs[index], ']', "%.4f"%scores[i], len(used_words), '/'.join(used_words)]])
+      line = ' '.join([str(x) for x in [predict_result, '[', all_distinct_text_strs[index], ']', "%.6f"%scores[i], len(used_words), '/'.join(used_words)]])
     else:
-      line = ' '.join([str(x) for x in [predict_result, '[', all_distinct_text_strs[index], ']', "%.4f"%scores[index], len(used_words), '/'.join(used_words)]])
+      line = ' '.join([str(x) for x in [predict_result, '[', all_distinct_text_strs[index], ']', "%.6f"%scores[index], len(used_words), '/'.join(used_words)]])
     logging.info(content_html.format(line))
 
 def print_neareast_words_from_sorted(scores, indexes):
   if len(scores) == len(indexes):
-    line = ' '.join(['%s:%.4f'%(vocab.key(int(index)), scores[i]) for i, index in enumerate(indexes)])
+    line = ' '.join(['%s:%.6f'%(vocab.key(int(index)), scores[i]) for i, index in enumerate(indexes)])
   else:
-    line = ' '.join(['%s:%.4f'%(vocab.key(int(index)), scores[index]) for i, index in enumerate(indexes)])
+    line = ' '.join(['%s:%.6f'%(vocab.key(int(index)), scores[index]) for i, index in enumerate(indexes)])
   logging.info(content_html.format(line))
 
 def print_img(img, i):
@@ -233,9 +233,9 @@ def print_img_text_negscore(img, i, text, score, text_ids, neg_text=None, neg_sc
   text_words = ids2text(text_ids)
   if neg_text is not None:
     neg_text_words = ids2text(neg_text_ids)
-  logging.info(content_html.format('pos:[ {} ] {:.4f} {}'.format(text, score, text_words)))
+  logging.info(content_html.format('pos:[ {} ] {:.6f} {}'.format(text, score, text_words)))
   if neg_text is not None:
-    logging.info(content_html.format('neg:[ {} ] {:.4f} {}'.format(neg_text, neg_score, neg_text_words)))  
+    logging.info(content_html.format('neg:[ {} ] {:.6f} {}'.format(neg_text, neg_score, neg_text_words)))  
 
 #for show and tell 
 def print_generated_text(generated_text, id=-1, name='gen'):
@@ -246,9 +246,9 @@ def print_generated_text(generated_text, id=-1, name='gen'):
 
 def print_generated_text_score(generated_text, score, id=-1, name='gen'):
   if id >= 0:
-    logging.info(content_html.format('{}_{}:[ {} ] {:.4f}'.format(name, id, ids2text(generated_text), score)))
+    logging.info(content_html.format('{}_{}:[ {} ] {:.6f}'.format(name, id, ids2text(generated_text), score)))
   else:
-    logging.info(content_html.format('{}:[ {} ] {:.4f}'.format(name, ids2text(generated_text), score)))
+    logging.info(content_html.format('{}:[ {} ] {:.6f}'.format(name, ids2text(generated_text), score)))
 
 def print_img_text_negscore_generatedtext(img, i, text, score,
                                           text_ids,  
@@ -279,7 +279,7 @@ def print_img_text_generatedtext(img, i, input_text, input_text_ids,
   input_text_words = ids2text(input_text_ids)
   text_words = ids2text(text_ids)
   logging.info(content_html.format('in_:[ {} ] {}'.format(input_text, input_text_words)))
-  logging.info(content_html.format('pos:[ {} ] {:.4f} {}'.format(text, score, text_words)))
+  logging.info(content_html.format('pos:[ {} ] {:.6f} {}'.format(text, score, text_words)))
   print_generated_text(generated_text)
   if generated_text_beam is not None:
     print_generated_text(generated_text_beam)
@@ -293,7 +293,7 @@ def print_img_text_generatedtext_score(img, i, input_text, input_text_ids,
   input_text_words = ids2text(input_text_ids)
   text_words = ids2text(text_ids)
   logging.info(content_html.format('in_:[ {} ] {}'.format(input_text, input_text_words)))
-  logging.info(content_html.format('pos:[ {} ] {:.4f} {}'.format(text, score, text_words)))
+  logging.info(content_html.format('pos:[ {} ] {:.6f} {}'.format(text, score, text_words)))
 
   try:
     print_generated_text_score(generated_text, generated_text_score)

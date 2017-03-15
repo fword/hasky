@@ -33,7 +33,8 @@ from tensorflow.python.ops import tensor_array_ops
 
 __all__ = [
     "attention_decoder_fn_train",
-    "attention_decoder_fn_inference"
+    "attention_decoder_fn_inference",
+    "init_attention"
 ]
 
 def attention_decoder_fn_train(encoder_state,
@@ -116,7 +117,7 @@ def attention_decoder_fn_train(encoder_state,
         cell_state = encoder_state
 
         # init attention
-        attention = _init_attention(encoder_state)
+        attention = init_attention(encoder_state)
       else:
         # construct attention
         attention = attention_construct_fn(cell_output, attention_keys,
@@ -129,13 +130,6 @@ def attention_decoder_fn_train(encoder_state,
       return (None, cell_state, next_input, cell_output, context_state)
 
   return decoder_fn
-
-import tensorflow as tf
-def gen_attention_context(attention_states, attention_option, decoder_hidden_size):
-  (attention_keys, attention_values, attention_score_fn,
-       attention_construct_fn) = (tf.contrib.seq2seq.prepare_attention(
-           attention_states, attention_option, decoder_hidden_size))
-  return attention_keys, attention_values, attention_score_fn
 
 def attention_decoder_fn_inference(output_fn,
                                    first_input,
@@ -291,7 +285,7 @@ def attention_decoder_fn_inference(output_fn,
             dtype=dtype, tensor_array_name="greedy_attention_path", size=0, dynamic_size=True, infer_shape=False)
 
         # init attention
-        attention = _init_attention(encoder_state)
+        attention = init_attention(encoder_state)
       else:
         # construct attention
         attention = attention_construct_fn(cell_output, attention_keys,
@@ -359,7 +353,7 @@ def prepare_attention(attention_states,
   return (attention_keys, attention_values, attention_score_fn,
           attention_construct_fn)
 
-def _init_attention(encoder_state):
+def init_attention(encoder_state):
   """Initialize attention. Handling both LSTM and GRU.
 
   Args:

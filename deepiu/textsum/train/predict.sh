@@ -41,9 +41,9 @@ python ./train.py \
   --feed_single $feed_single \
   --seq_decode_method 0 \
   --dynamic_batch_length 1 \
-  --use_dynamic_decode 0 \
   --rnn_method 0 \
-  --beam_size 20 \
+  --beam_size 10 \
+  --decode_max_words 10 \
   --add_text_start 1 \
   --rnn_output_method 3 \
   --mode predict \

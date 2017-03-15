@@ -25,7 +25,8 @@ from tensorflow.python.ops import variable_scope
 from tensorflow.contrib.rnn.python.ops import core_rnn_cell_impl
 from tensorflow.python.ops import array_ops
 
-from melt.seq2seq import beam_decoder_fn_inference
+from melt.seq2seq.beam_decoder_fn import beam_decoder_fn_inference
+from melt.seq2seq.attention_decoder_fn import init_attention
 
 def rnn_decoder(decoder_inputs, initial_state, cell, loop_function=None,
                 scope=None):
@@ -62,7 +63,7 @@ def rnn_decoder(decoder_inputs, initial_state, cell, loop_function=None,
     for i, inp in enumerate(decoder_inputs):
       if loop_function is not None and prev is not None:
         with variable_scope.variable_scope("loop_function", reuse=True):
-          inp, state = loop_function(prev, i, state)
+          inp, state = loop_function(i, prev, state)
       if i > 0:
         variable_scope.get_variable_scope().reuse_variables()
       output, state = cell(inp, state)
@@ -126,13 +127,14 @@ def beam_decode(input, max_words, initial_state, cell, loop_function, scope=None
         decoder.decoder_inputs,
         decoder.initial_state,
         cell=cell,
-        loop_function = lambda prev, i, state: loop_function(decoder.take_step(prev, i, state), i),
+        loop_function = lambda i, prev, state: loop_function(i, decoder.take_step(i, prev, state)),
         scope=scope
     )
     
     if topn == 1:
-      score = decoder.logprobs_finished_beams
-      path = decoder.finished_beams
+      #compat with topn > 1
+      score = [decoder.logprobs_finished_beams]
+      path = [decoder.finished_beams]
     else:
       path, score = decoder.calc_topn()
     
@@ -218,32 +220,6 @@ def dynamic_beam_decode(input, max_steps, initial_state, cell, embedding, scope=
       score = tf.exp(score)
     return path, score
 
-#TODO copy from melt.seq2seq.attention_decoder_fn
-def _init_attention(encoder_state):
-  """Initialize attention. Handling both LSTM and GRU.
-
-  Args:
-    encoder_state: The encoded state to initialize the `dynamic_rnn_decoder`.
-
-  Returns:
-    attn: initial zero attention vector.
-  """
-
-  # Multi- vs single-layer
-  # TODO(thangluong): is this the best way to check?
-  if isinstance(encoder_state, tuple):
-    top_state = encoder_state[-1]
-  else:
-    top_state = encoder_state
-
-  # LSTM vs GRU
-  if isinstance(top_state, core_rnn_cell_impl.LSTMStateTuple):
-    attn = array_ops.zeros_like(top_state.h)
-  else:
-    attn = array_ops.zeros_like(top_state)
-
-  return attn
-
 #TODO FIXME here may have some bugs, since inference compare with exact_prob calc for some seq -> seq the score diff
 #Will implement out graph interactive one comprare and check result and performance
 #now without beam size 10, about seq->seq 20->4 10w vocab, about 70-100ms, notice the first decode will be slow 400ms+
@@ -278,14 +254,16 @@ class BeamDecoder():
     self.decoder_inputs = [None] * self.max_len
     #->[batch_size * beam_size, emb_dim]
     if attention_construct_fn is not None:
-      input = tf.concat([input, _init_attention(initial_state)], 1)
+      input = tf.concat([input, init_attention(initial_state)], 1)
+
     self.decoder_inputs[0] = self.tile_along_beam(input)
 
-    assert len(initial_state) == 2, 'state is tuple of 2 elements'
-    initial_state =  tf.concat(initial_state, 1)
+    self.state_is_tuple = len(initial_state) == 2
+    if self.state_is_tuple:
+      initial_state =  tf.concat(initial_state, 1)
     self.initial_state = self.tile_along_beam(initial_state)
-
-    self.initial_state = tf.split(self.initial_state, 2, 1)
+    if self.state_is_tuple:
+      self.initial_state = tf.split(self.initial_state, 2, 1)
 
     self.attention_construct_fn = attention_construct_fn
     self.attention_keys = self.tile_along_beam_attention(attention_keys) \
@@ -350,9 +328,9 @@ class BeamDecoder():
        [ 3.20000005,  0.2       ,  1.5       ]
        ], dtype=float32)
     Args:
-      tensor: a 2-D tensor, [batch_size x T]
+      tensor: a 3-D tensor, [batch_size, N,  T]
     Return:
-      An [batch_size*beam_size x T] tensor, where each row of the input
+      An [batch_size*beam_size, N, T] tensor, where each row of the input
       tensor is copied beam_size times in a row in the output
     """
     res = tf.tile(tensor, [1, self.beam_size, 1])
@@ -374,6 +352,7 @@ class BeamDecoder():
     #[batch_size, topn]
     top_logprobs, indices = tf.nn.top_k(logprobs, self.topn)
 
+    #-2 because max_words = max_len - 2
     length = self.beam_size * (self.max_len - 2)
     indice_offsets = tf.reshape(
       (tf.range(self.batch_size * length) // length) * length,
@@ -394,7 +373,7 @@ class BeamDecoder():
 
     return top_paths, top_logprobs
         
-  def take_step(self, prev, i, state):
+  def take_step(self, i, prev, state):
     output_projection = self.output_projection
     if self.attention_construct_fn is not None:
       #prev is as cell_output, see contrib\seq2seq\python\ops\attention_decoder_fn.py
@@ -482,10 +461,15 @@ class BeamDecoder():
                                     )
       
       #we must also choose corresponding past state as new start
-      state = tf.reshape(tf.gather(state[0], past_indices), 
-                         [self.batch_size * self.beam_size, -1]), \
-              tf.reshape(tf.gather(state[1], past_indices),
-                         [self.batch_size * self.beam_size, -1])
+      past_indices = tf.reshape(past_indices, [-1])
+      if self.state_is_tuple:
+        state = tf.gather(state[0], past_indices), tf.gather(state[1], past_indices)
+      else:
+        state = tf.gather(state, past_indices)
+
+      if attention is not None:
+        #attenion must also choose corresponding past attention
+        attention = tf.gather(attention, past_indices)
 
       if self.topn > 1:
         #[batch_size, beam_size, max_len]
@@ -540,6 +524,6 @@ class BeamDecoder():
     if attention is None:
       return symbols_flat, state
     else:
-      return (symbols_flat, attention), state
+      return symbols_flat, state, attention
   
 

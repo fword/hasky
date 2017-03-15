@@ -63,6 +63,35 @@ def train_once(sess,
   info = BytesIO()
   stop = False
 
+  if is_start or eval_interval_steps and step % eval_interval_steps == 0:
+    if eval_ops is not None:
+      eval_feed_dict = {} if gen_eval_feed_dict is None else gen_eval_feed_dict()
+      #eval_feed_dict.update(feed_dict)
+      
+      #------show how to perf debug
+      ##timer_ = gezi.Timer('sess run generate')
+      ##sess.run(eval_ops[-2], feed_dict=None)
+      ##timer_.print()
+      
+      timer_ = gezi.Timer('sess run eval_ops')
+      eval_results = sess.run(eval_ops, feed_dict=eval_feed_dict)
+      timer_.print()
+      if deal_eval_results is not None:
+        #@TODO user print should also use logging as a must ?
+        #print(gezi.now_time(), epoch_str, 'eval_step: %d'%step, 'eval_metrics:', end='')
+        logging.info2('{} eval_step: {} eval_metrics:'.format(epoch_str, step))
+        eval_stop = deal_eval_results(eval_results)
+
+      eval_loss = gezi.get_singles(eval_results)
+      assert len(eval_loss) > 0
+      if eval_stop is True: stop = True
+      eval_names_ = melt.adjust_names(eval_loss, eval_names)
+
+      melt.set_global('eval_loss', melt.parse_results(eval_loss, eval_names_))
+    elif interval_steps != eval_interval_steps:
+      #print()
+      pass
+
   if ops is not None:
     if deal_results is None and names is not None:
       deal_results = lambda x: melt.print_results(x, names)
@@ -171,34 +200,6 @@ def train_once(sess,
         #end = '' if eval_ops is None else '\n'
         #print(gezi.now_time(), epoch_str, 'eval_step: %d'%step, train_average_loss_str, end=end)
         logging.info2('{} eval_step: {} {}'.format(epoch_str, step, train_average_loss_str))
-    
-    if eval_ops is not None:
-      eval_feed_dict = {} if gen_eval_feed_dict is None else gen_eval_feed_dict()
-      #eval_feed_dict.update(feed_dict)
-      
-      #------show how to perf debug
-      ##timer_ = gezi.Timer('sess run generate')
-      ##sess.run(eval_ops[-2], feed_dict=None)
-      ##timer_.print()
-      
-      timer_ = gezi.Timer('sess run eval_ops')
-      eval_results = sess.run(eval_ops, feed_dict=eval_feed_dict)
-      timer_.print()
-      if deal_eval_results is not None:
-        #@TODO user print should also use logging as a must ?
-        #print(gezi.now_time(), epoch_str, 'eval_step: %d'%step, 'eval_metrics:', end='')
-        logging.info2('{} eval_step: {} eval_metrics:'.format(epoch_str, step))
-        eval_stop = deal_eval_results(eval_results)
-
-      eval_loss = gezi.get_singles(eval_results)
-      assert len(eval_loss) > 0
-      if eval_stop is True: stop = True
-      eval_names_ = melt.adjust_names(eval_loss, eval_names)
-
-      melt.set_global('eval_loss', melt.parse_results(eval_loss, eval_names_))
-    elif interval_steps != eval_interval_steps:
-      #print()
-      pass
 
     if log_dir:
       #timer_ = gezi.Timer('witting log')
