@@ -16,8 +16,6 @@ import tensorflow as tf
 flags = tf.app.flags
 FLAGS = flags.FLAGS
 
-flags.DEFINE_boolean('use_beam_search', True, '')
-  
 import melt
 
 from deepiu.seq2seq import embedding
@@ -120,10 +118,10 @@ class Seq2seqPredictor(Seq2seq, melt.PredictorBase):
     with tf.variable_scope("decode"):
       batch_size = tf.shape(input_text)[0]
       decoder_input = self.decoder.get_start_embedding_input(batch_size)
-
+      max_words = FLAGS.decode_max_words if FLAGS.decode_max_words else TEXT_MAX_WORDS
       if decode_method == SeqDecodeMethod.greedy:
         return self.decoder.generate_sequence_greedy(decoder_input, 
-                                       max_steps=TEXT_MAX_WORDS, 
+                                       max_words=max_words, 
                                        initial_state=state,
                                        attention_states=encoder_output,
                                        convert_unk=convert_unk)
@@ -135,7 +133,7 @@ class Seq2seqPredictor(Seq2seq, melt.PredictorBase):
         else:
           raise ValueError('not supported decode_method: %d' % decode_method)
         return decode_func(decoder_input, 
-                           max_steps=TEXT_MAX_WORDS, 
+                           max_words=max_words, 
                            initial_state=state,
                            attention_states=encoder_output,
                            beam_size=beam_size, 

@@ -65,7 +65,7 @@ class BeamSearchState(object):
 def beam_search(init_states, 
                 step_func, 
                 end_id, 
-                max_steps=20, 
+                max_words, 
                 length_normalization_factor=0.):
   """
   Runs beam search caption generation on a single input
@@ -74,7 +74,7 @@ def beam_search(init_states,
 
   Args:
     init_states is a tuple of (state, ids, logprobs)
-    max_steps here means max decode length ie if 3 means oly can generate: A B C
+    max_words here means max decode length/max words ie if 3 means oly can generate: A B C
   Returns:
     A list of BeamSearchState sorted by descending score.
   """
@@ -97,8 +97,8 @@ def beam_search(init_states,
         metadata=[""])
       partial_beams.push(beam)
 
-  # Run beam search. max_steps not - 1 for we wil consider <Done> as an additional step
-  for _ in range(max_steps):
+  # Run beam search. max_words not - 1 for we wil consider <Done> as an additional step
+  for _ in range(max_words):
     partial_beams_list = partial_beams.extract()
     partial_beams.reset()
     input_feed = np.array([c.words[-1] for c in partial_beams_list])
@@ -127,12 +127,6 @@ def beam_search(init_states,
           beam = BeamSearchState(words, state[i], logprob, score, logprob_list, metadata_list)
           partial_beams.push(beam)
 
-    #TODO: can be more greedy if not using length_normalization_factor ie if shorter path done better then
-    #longger path can not be better so do not need to search
-    
-    #if length_normalization_factor == 0. and complete_beams.size() == beam_size:
-    #  break
-
     if partial_beams.size() == 0:
       # We have run out of partial candidates; happens when beam_size = 1.
       break
@@ -141,7 +135,7 @@ def beam_search(init_states,
   # But never output a mixture of complete and partial captions because a
   # partial caption could have a higher score than all the complete captions.
   if not complete_beams.size():
-    print('Warning no complete beam after max_steps, for patial results may be one step more then max_steps:', max_steps) 
+    print('Warning no complete beam after max_words, for patial results may be one step more then max_words:', max_words) 
     complete_beams = partial_beams
 
   return complete_beams.extract(sort=True)  

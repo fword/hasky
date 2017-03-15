@@ -65,19 +65,19 @@ flags.DEFINE_string('attention_option', 'luong', 'luong or bahdanau')
 flags.DEFINE_boolean('use_dynamic_decode', False, 'wether to use dynamic decode')
 
 flags.DEFINE_integer('beam_size', 10, 'for seq decode beam search size')
+flags.DEFINE_integer('decode_max_words', 0, 'if 0 use TEXT_MAX_WORDS from conf.py otherwise use decode_max_words')
 
 import functools
 import melt 
 from deepiu.util import vocabulary
 from deepiu.seq2seq.decoder import Decoder
 
-
 class SeqDecodeMethod:
   greedy = 0
   sample = 1
   full_sample = 2
-  beam = 3  # ingraph beam search
-  beam_search = 4  #outgraph beam search/ interactve beam search
+  beam = 3         # ingraph beam search
+  beam_search = 4  # outgraph beam search/ interactve beam search
 
 class RnnDecoder(Decoder):
   def __init__(self, is_training=True, is_predict=False):
@@ -242,7 +242,7 @@ class RnnDecoder(Decoder):
  
     return loss
 
-  def generate_sequence_greedy(self, input, max_steps, 
+  def generate_sequence_greedy(self, input, max_words, 
                         initial_state=None, attention_states=None,
                         convert_unk=True, 
                         emb=None):
@@ -266,7 +266,7 @@ class RnnDecoder(Decoder):
                     encoder_state=state,
                     embeddings=emb,
                     end_of_sequence_id=self.end_id,
-                    maximum_length=max_steps,
+                    maximum_length=max_words,
                     num_decoder_symbols=self.vocab_size,
                     dtype=tf.int32)
     else:
@@ -283,7 +283,7 @@ class RnnDecoder(Decoder):
               attention_construct_fn=attention_construct_fn,
               embeddings=emb,
               end_of_sequence_id=self.end_id,
-              maximum_length=max_steps,
+              maximum_length=max_words,
               num_decoder_symbols=self.vocab_size,
               dtype=tf.int32))
 
@@ -298,7 +298,7 @@ class RnnDecoder(Decoder):
     #------like beam search return sequence, score
     return generated_sequence, tf.zeros([batch_size,])
 
-  def generate_sequence_beam(self, input, max_steps, 
+  def generate_sequence_beam(self, input, max_words, 
                              initial_state=None, attention_states=None,
                              beam_size=5, convert_unk=True,
                              length_normalization_factor=0., 
@@ -310,7 +310,8 @@ class RnnDecoder(Decoder):
     if emb is None:
       emb = self.emb
 
-    def loop_function(prev, i):
+    def loop_function(step_result, i):
+      prev, state = step_result
       if isinstance(prev, tuple):
         prev, attention = prev
       else:
@@ -319,7 +320,7 @@ class RnnDecoder(Decoder):
       logit_symbols = tf.nn.embedding_lookup(emb, prev)
       if attention is not None:
         logit_symbols = tf.concat([logit_symbols, attention], 1)
-      return logit_symbols
+      return logit_symbols, state
 
     state = self.cell.zero_state(tf.shape(input)[0], tf.float32) if initial_state is None else initial_state
     
@@ -330,7 +331,7 @@ class RnnDecoder(Decoder):
         self.prepare_attention(attention_states)
 
     #TODO to be safe make topn the same as beam size
-    return melt.seq2seq.beam_decode(input, max_steps, state, 
+    return melt.seq2seq.beam_decode(input, max_words, state, 
                                     self.cell, loop_function, scope=self.scope,
                                     beam_size=beam_size, done_token=vocabulary.vocab.end_id(), 
                                     output_projection=(self.w, self.v),
@@ -340,13 +341,14 @@ class RnnDecoder(Decoder):
                                     attention_keys=attention_keys,
                                     attention_values=attention_values)    
 
-  def generate_sequence_beam_search(self, input, max_steps, 
+  def generate_sequence_beam_search(self, input, max_words=None, 
                                   initial_state=None, attention_states=None,
                                   beam_size=10, convert_unk=True,
                                   length_normalization_factor=0., 
                                   emb=None):
     """
     outgraph beam search, input should be one instance only batch_size=1
+    max_words actuaolly not used here... for it is determined outgraph..
     return top (path, score)
     TODO add attention support!
     """
@@ -370,9 +372,6 @@ class RnnDecoder(Decoder):
                                   shape=[None],  # batch_size
                                   name="input_feed")
       tf.add_to_collection('beam_search_input_feed', input_feed)
-      #input_seqs = tf.expand_dims(input_feed, 1)
-      #seq_embeddings = tf.nn.embedding_lookup(emb, input_seqs)
-      #input=tf.squeeze(seq_embeddings, squeeze_dims=[1])
       input = tf.nn.embedding_lookup(emb, input_feed)
 
       # Placeholder for feeding a batch of concatenated states.
@@ -413,7 +412,6 @@ class RnnDecoder(Decoder):
        melt.seq2seq.prepare_attention(attention_states, attention_option, self.num_units)
     return attention_keys, attention_values, attention_score_fn, attention_construct_fn
 
-  #TODO better, handle, without encoder_output?
   def get_start_input(self, batch_size):
     start_input = melt.constants(self.start_id, [batch_size], tf.int32)
     return start_input
@@ -427,7 +425,7 @@ class RnnDecoder(Decoder):
 
   def normalize_length(self, loss, sequence_length, exact_prob=False):
     sequence_length = tf.cast(sequence_length, tf.float32)
-    #-- below is used when using melt.seq2seq.loss.exact_predict_loss
+    #-- below is used only when using melt.seq2seq.loss.exact_predict_loss
     if not exact_prob:
       sequence_length = tf.reshape(sequence_length, [-1, 1])
       loss = loss * sequence_length 
@@ -436,7 +434,6 @@ class RnnDecoder(Decoder):
     return loss
 
   def get_start_id(self):
-    #start_id = vocabulary.start_id()
     start_id = None
     if not FLAGS.input_with_start_mark and FLAGS.add_text_start:
       if FLAGS.zero_as_text_start:

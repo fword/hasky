@@ -13,7 +13,8 @@
 # limitations under the License.
 # ==============================================================================
 
-"""Seq2seq loss operations for use in neural networks.
+"""
+depreciated
 """
 
 from __future__ import absolute_import

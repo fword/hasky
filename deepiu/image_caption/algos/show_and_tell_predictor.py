@@ -68,12 +68,12 @@ class ShowAndTellPredictor(ShowAndTell, melt.PredictorBase):
     
     if decode_method == SeqDecodeMethod.greedy:
       return self.decoder.generate_sequence_greedy(decoder_input, 
-                                            max_steps=TEXT_MAX_WORDS, 
+                                            max_words=TEXT_MAX_WORDS, 
                                             initial_state=state, 
                                             convert_unk=convert_unk)
     elif decode_method == SeqDecodeMethod.beam:
       return self.decoder.generate_sequence_beam(decoder_input,
-                                                 max_steps=TEXT_MAX_WORDS, 
+                                                 max_words=TEXT_MAX_WORDS, 
                                                  initial_state=state, 
                                                  beam_size=beam_size, 
                                                  convert_unk=convert_unk,

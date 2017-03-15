@@ -20,6 +20,7 @@ FLAGS = flags.FLAGS
 #flags.DEFINE_string('model_dir', '/home/gezi/temp/textsum/model.seq2seq.attention/', '')
 flags.DEFINE_string('model_dir', '/home/gezi/temp/textsum/model.seq2seq/', '')
 flags.DEFINE_string('vocab', '/home/gezi/temp/textsum/tfrecord/seq-basic.10w/train/vocab.txt', 'vocabulary file')
+#flags.DEFINE_integer('decode_max_words', 10, 'if 0 use TEXT_MAX_WORDS from conf.py otherwise use decode_max_words')
 
 import sys, os, math
 import gezi, melt
@@ -68,15 +69,15 @@ def predict(predictor, input_text):
                                           tf.get_collection('beam_search_state_feed')[0] : state_feed
                                         })
 
-
-  beams = melt.seq2seq.beam_search(init_states, step_func, 
-                                   text2ids.end_id(), 
-                                   max_steps=20, 
+  max_words = FLAGS.decode_max_words if FLAGS.decode_max_words else TEXT_MAX_WORDS
+  beams = melt.seq2seq.beam_search(init_states, 
+                                   step_func, 
+                                   end_id=text2ids.end_id(), 
+                                   max_words=max_words, 
                                    length_normalization_factor=0.)
 
   for i, beam in enumerate(beams):
-    print(i, beam.words, text2ids.ids2text(beam.words), beam.logprob, beam.score, math.exp(beam.logprob))
-    print(beam.logprobs)
+    print(i, beam.words, text2ids.ids2text(beam.words), math.exp(beam.logprob), beam.logprob, beam.score, beam.logprobs)
 
   print('beam search using time(ms):', timer.elapsed_ms())
 

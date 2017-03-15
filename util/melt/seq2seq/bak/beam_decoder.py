@@ -27,10 +27,10 @@ from tensorflow.python.ops import array_ops
 
 from melt.seq2seq import beam_decoder_fn_inference
 
+#--for debug only now
 def rnn_decoder(decoder_inputs, initial_state, cell, loop_function=None,
                 scope=None):
   """RNN decoder for the sequence-to-sequence model.
-     copy from tf contrib but modify a bit add state change
 
   Args:
     decoder_inputs: A list of 2D Tensors [batch_size x input_size].
@@ -62,7 +62,7 @@ def rnn_decoder(decoder_inputs, initial_state, cell, loop_function=None,
     for i, inp in enumerate(decoder_inputs):
       if loop_function is not None and prev is not None:
         with variable_scope.variable_scope("loop_function", reuse=True):
-          inp, state = loop_function(prev, i, state)
+          inp = loop_function(prev, i)
       if i > 0:
         variable_scope.get_variable_scope().reuse_variables()
       output, state = cell(inp, state)
@@ -122,11 +122,13 @@ def beam_decode(input, max_words, initial_state, cell, loop_function, scope=None
                           attention_keys=attention_keys, 
                           attention_values=attention_values)
     
+    #_ = tf.nn.seq2seq.rnn_decoder(
+    #_ = tf.contrib.legacy_seq2seq.rnn_decoder(
     _ = rnn_decoder(
         decoder.decoder_inputs,
         decoder.initial_state,
         cell=cell,
-        loop_function = lambda prev, i, state: loop_function(decoder.take_step(prev, i, state), i),
+        loop_function = lambda prev, i: loop_function(decoder.take_step(prev, i), i),
         scope=scope
     )
     
@@ -394,7 +396,7 @@ class BeamDecoder():
 
     return top_paths, top_logprobs
         
-  def take_step(self, prev, i, state):
+  def take_step(self, prev, i):
     output_projection = self.output_projection
     if self.attention_construct_fn is not None:
       #prev is as cell_output, see contrib\seq2seq\python\ops\attention_decoder_fn.py
@@ -439,9 +441,7 @@ class BeamDecoder():
       #past_logprobs    [batch_size, beam_size] -> [batch_size, beam_size, 1]
       logprobs_batched = logprobs_batched + tf.expand_dims(self.past_logprobs, 2)
 
-      #get [batch_size, beam_size] each
       self.past_logprobs, indices = tf.nn.top_k(
-          #[batch_size, beam_size * num_classes]
           tf.reshape(logprobs_batched + nondone_mask, 
                      [-1, self.beam_size * self.num_classes]),
           self.beam_size)       
@@ -473,19 +473,8 @@ class BeamDecoder():
       
       #self.past_symbols [batch_size, beam_size, i - 1] -> past_symbols_batch_major [batch_size * beam_size, i - 1]
       past_symbols_batch_major = tf.reshape(self.past_symbols, [-1, i-1])
-     
-      #[batch_size, beam_size]
-      past_indices = parent_refs + parent_refs_offsets 
-      #-> [batch_size, beam_size, i - 1]
-      beam_past_symbols = tf.gather(past_symbols_batch_major,            #[batch_size * beam_size, i - 1]
-                                    past_indices                         #[batch_size, beam_size]
-                                    )
-      
-      #we must also choose corresponding past state as new start
-      state = tf.reshape(tf.gather(state[0], past_indices), 
-                         [self.batch_size * self.beam_size, -1]), \
-              tf.reshape(tf.gather(state[1], past_indices),
-                         [self.batch_size * self.beam_size, -1])
+      beam_past_symbols = tf.gather(past_symbols_batch_major,
+                                    parent_refs + parent_refs_offsets)
 
       if self.topn > 1:
         #[batch_size, beam_size, max_len]
@@ -538,8 +527,8 @@ class BeamDecoder():
     symbols_flat = tf.reshape(symbols, [-1])
 
     if attention is None:
-      return symbols_flat, state
+      return symbols_flat
     else:
-      return (symbols_flat, attention), state
+      return symbols_flat, attention
   
 
