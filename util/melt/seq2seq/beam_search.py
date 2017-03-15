@@ -141,7 +141,8 @@ def beam_search(init_states,
   # But never output a mixture of complete and partial captions because a
   # partial caption could have a higher score than all the complete captions.
   if not complete_beams.size():
-    print('----------------------warning no complete beam after max_steps:', max_steps) 
+    print('Warning no complete beam after max_steps, for patial results may be one step more then max_steps:', max_steps) 
     complete_beams = partial_beams
 
   return complete_beams.extract(sort=True)  
+

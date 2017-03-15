@@ -382,7 +382,7 @@ class RnnDecoder(Decoder):
       tf.add_to_collection('beam_search_state_feed', state_feed)
       state_tuple = tf.split(value=state_feed, num_or_size_splits=2, axis=1)
       
-      state, top_logprobs, top_ids = beam_search_step(input, state_tuple)
+      state_tuple, top_logprobs, top_ids = beam_search_step(input, state_tuple)
 
       # Concatentate the resulting state.
       state = tf.concat(state_tuple, 1, name="state")

@@ -11,7 +11,7 @@
 .vs 
 .vscode
 ./vscode/*
-.vs/hasky/v14/.suo 
+.vs/*
 model.ckpt*
 /data
 /build
