@@ -95,12 +95,15 @@ def main(_):
 
     timer = gezi.Timer()
     print(tf.get_collection('encode_state'), len(tf.get_collection('encode_state')))
-    texts, scores,  atkeys  = sess.run([beam_text, beam_score, 
-                                             tf.get_collection('attention_keys')[0]
+    texts, scores,  atkeys, atvals  = sess.run([beam_text, beam_score, 
+                                             tf.get_collection('attention_keys')[0],
+                                             tf.get_collection('attention_values')[0],
                                              ], 
                                             {predictor.input_text_feed : [word_ids]})
 
     print(atkeys)
+    print(atvals)
+    print(np.shape(atkeys), np.shape(atvals))
 
     texts = texts[0]
     scores = scores[0]
@@ -111,8 +114,8 @@ def main(_):
 
   input_texts = [
                  '大棚辣椒果实变小怎么办,大棚辣椒果实变小防治措施',
-                 #'包邮买二送一性感女内裤低腰诱惑透视蕾丝露臀大蝴蝶三角内裤女夏-淘宝网',
-                 '包邮买二送一性感女内裤低腰诱惑透视蕾丝露臀大蝴蝶',
+                 '包邮买二送一性感女内裤低腰诱惑透视蕾丝露臀大蝴蝶三角内裤女夏-淘宝网',
+                 #'包邮买二送一性感女内裤低腰诱惑透视蕾丝露臀大蝴蝶', #same length as lajiao sentence 15
                  #"宝宝太胖怎么办呢",
                  #'大棚辣椒果实变小怎么办,大棚辣椒果实变小防治措施',
                  #'大棚辣椒果实变小怎么办,大棚辣椒果实变小防治措施',
@@ -121,13 +124,15 @@ def main(_):
 
   word_ids_list = [_text2ids(input_text, INPUT_TEXT_MAX_WORDS) for input_text in input_texts]
   timer = gezi.Timer()
-  texts_list, scores_list, atkeys = sess.run([beam_text, beam_score, 
-                                             tf.get_collection('attention_keys')[0]
+  texts_list, scores_list, atkeys, atvals = sess.run([beam_text, beam_score, 
+                                             tf.get_collection('attention_keys')[0],
+                                             tf.get_collection('attention_values')[0]
                                              ], 
                              feed_dict={predictor.input_text_feed: word_ids_list})
   
   print(atkeys)
-  print(np.shape(atkeys))
+  print(atvals)
+  print(np.shape(atkeys), np.shape(atvals))
 
   for texts, scores in zip(texts_list, scores_list):
     for text, score in zip(texts, scores):
