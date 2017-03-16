@@ -83,7 +83,8 @@ def beam_decode(input, max_words, initial_state, cell, loop_function, scope=None
     make small modifications, add more comments and add topn support, and 
     length_normalization_factor
 
-    TODO: consider beam search decoder from https://github.com/google/seq2seq
+    NOTICE!: not dynamic, for loop based here
+    TODO: consider beam search decoder from https://github.com/google/seq2seq, that implementation might be dynamic!
     
     Args:
       decoder_inputs: A list of 2D Tensors [batch_size x input_size].
@@ -127,7 +128,7 @@ def beam_decode(input, max_words, initial_state, cell, loop_function, scope=None
         decoder.decoder_inputs,
         decoder.initial_state,
         cell=cell,
-        loop_function = lambda i, prev, state: loop_function(i, decoder.take_step(i, prev, state)),
+        loop_function = lambda i, prev, state: loop_function(i, prev, state, decoder),
         scope=scope
     )
     
@@ -142,83 +143,6 @@ def beam_decode(input, max_words, initial_state, cell, loop_function, scope=None
       score = tf.exp(score)
     return path, score
 
-import tensorflow as tf
-def dynamic_beam_decode(input, max_steps, initial_state, cell, embedding, scope=None,
-                beam_size=7, done_token=0, num_classes=None,
-                output_projection=None,  length_normalization_factor=0.,
-                prob_as_score=True, topn=1):
-    """
-    dynamic version not work and not usefull maybe , depreciated, right now not used also
-
-    Beam search decoder
-    copy from https://gist.github.com/igormq/000add00702f09029ea4c30eba976e0a
-    make small modifications, add more comments and add topn support, and 
-    length_normalization_factor
-    
-    Args:
-      decoder_inputs: A list of 2D Tensors [batch_size x input_size].
-      initial_state: 2D Tensor with shape [batch_size x cell.state_size].
-      cell: rnn_cell.RNNCell defining the cell function and size.
-      loop_function: This function will be applied to the i-th output
-        in order to generate the i+1-st input, and decoder_inputs will be ignored,
-        except for the first element ("GO" symbol). 
-        Signature -- loop_function(prev_symbol, i) = next
-          * prev_symbol is a 1D Tensor of shape [batch_size*beam_size]
-          * i is an integer, the step number (when advanced control is needed),
-          * next is a 2D Tensor of shape [batch_size*beam_size, input_size].
-      scope: Passed to seq2seq.rnn_decoder
-      beam_size: An integer beam size to use for each example
-      done_token: An integer token that specifies the STOP symbol
-      
-    Return:
-      A tensor of dimensions [batch_size, len(decoder_inputs)] that corresponds to
-      the 1-best beam for each batch.
-      
-    Known limitations:
-      * The output sequence consisting of only a STOP symbol is not considered
-        (zero-length sequences are not very useful, so this wasn't implemented)
-      * The computation graph this creates is messy and not very well-optimized
-
-    TODO: allow return top n result
-    """
-
-    #TODO may be not input num_classes?
-    assert num_classes is not None
-
-    decoder = BeamDecoder(input, max_steps, initial_state, 
-                          beam_size=beam_size, done_token=done_token, 
-                          num_classes=num_classes,
-                          output_projection=output_projection,
-                          length_normalization_factor=length_normalization_factor,
-                          topn=topn)
-    
-    def output_fn(output, i):
-      next_input_id = decoder.take_step(output, i)
-      return decoder.output, next_input_id
-
-    decoder_fn_inference = beam_decoder_fn_inference(
-                  output_fn=output_fn,
-                  first_input=decoder.decoder_inputs[0],
-                  encoder_state=decoder.initial_state,
-                  embeddings=embedding,
-                  end_of_sequence_id=done_token,
-                  maximum_length=max_steps,
-                  num_decoder_symbols=num_classes,
-                  decoder=decoder,
-                  dtype=tf.int32)
-
-    (decoder_outputs_inference, decoder_state_inference,
-      decoder_context_state_inference) = (tf.contrib.seq2seq.dynamic_rnn_decoder(
-               cell=cell,
-               decoder_fn=decoder_fn_inference,
-               scope=scope))
-
-    score = decoder.logprobs_finished_beams
-    path = decoder_context_state_inference
-
-    if prob_as_score:
-      score = tf.exp(score)
-    return path, score
 
 #TODO FIXME here may have some bugs, since inference compare with exact_prob calc for some seq -> seq the score diff
 #Will implement out graph interactive one comprare and check result and performance
@@ -270,6 +194,10 @@ class BeamDecoder():
       if attention_keys is not None else None
     self.attention_values = self.tile_along_beam_attention(attention_values) \
      if attention_values is not None else None
+
+    #---for debug
+    if self.attention_construct_fn:
+      tf.add_to_collection('attention_keys', self.attention_keys)
                       
   def tile_along_beam(self, tensor):
     """
@@ -377,6 +305,12 @@ class BeamDecoder():
     output_projection = self.output_projection
     if self.attention_construct_fn is not None:
       #prev is as cell_output, see contrib\seq2seq\python\ops\attention_decoder_fn.py
+      #NOTICE unlike dyanmic version, here it will be called many max_len times when buidling graph
+      #TODO here will face seq2seq/main/decode/attention_construct/weights problem not setting scope reuse, for the sencod time, i=2
+      #so now need to hack see like  self.generate_sequence_greedy(input, max_words, initial_state, attention_states, convert_unk, emb)
+      #in rnn_decoder.py before beam decode 
+      #when ever you use loop, not dynamic while_loop like static rnn loop, you must always care about scope reuse problem!!
+      #make it safe for any env
       attention = self.attention_construct_fn(prev, self.attention_keys, self.attention_values)
       prev = attention
     else:
@@ -521,9 +455,85 @@ class BeamDecoder():
     #->[batch_size * beam_size,]
     symbols_flat = tf.reshape(symbols, [-1])
 
-    if attention is None:
-      return symbols_flat, state
-    else:
-      return symbols_flat, state, attention
+    return symbols_flat, state, attention
+
+
+import tensorflow as tf
+def dynamic_beam_decode(input, max_steps, initial_state, cell, embedding, scope=None,
+                beam_size=7, done_token=0, num_classes=None,
+                output_projection=None,  length_normalization_factor=0.,
+                prob_as_score=True, topn=1):
+    """
+    dynamic version not work and not usefull maybe , depreciated, right now not used also
+
+    Beam search decoder
+    copy from https://gist.github.com/igormq/000add00702f09029ea4c30eba976e0a
+    make small modifications, add more comments and add topn support, and 
+    length_normalization_factor
+    
+    Args:
+      decoder_inputs: A list of 2D Tensors [batch_size x input_size].
+      initial_state: 2D Tensor with shape [batch_size x cell.state_size].
+      cell: rnn_cell.RNNCell defining the cell function and size.
+      loop_function: This function will be applied to the i-th output
+        in order to generate the i+1-st input, and decoder_inputs will be ignored,
+        except for the first element ("GO" symbol). 
+        Signature -- loop_function(prev_symbol, i) = next
+          * prev_symbol is a 1D Tensor of shape [batch_size*beam_size]
+          * i is an integer, the step number (when advanced control is needed),
+          * next is a 2D Tensor of shape [batch_size*beam_size, input_size].
+      scope: Passed to seq2seq.rnn_decoder
+      beam_size: An integer beam size to use for each example
+      done_token: An integer token that specifies the STOP symbol
+      
+    Return:
+      A tensor of dimensions [batch_size, len(decoder_inputs)] that corresponds to
+      the 1-best beam for each batch.
+      
+    Known limitations:
+      * The output sequence consisting of only a STOP symbol is not considered
+        (zero-length sequences are not very useful, so this wasn't implemented)
+      * The computation graph this creates is messy and not very well-optimized
+
+    TODO: allow return top n result
+    """
+
+    #TODO may be not input num_classes?
+    assert num_classes is not None
+
+    decoder = BeamDecoder(input, max_steps, initial_state, 
+                          beam_size=beam_size, done_token=done_token, 
+                          num_classes=num_classes,
+                          output_projection=output_projection,
+                          length_normalization_factor=length_normalization_factor,
+                          topn=topn)
+    
+    def output_fn(output, i):
+      next_input_id = decoder.take_step(output, i)
+      return decoder.output, next_input_id
+
+    decoder_fn_inference = beam_decoder_fn_inference(
+                  output_fn=output_fn,
+                  first_input=decoder.decoder_inputs[0],
+                  encoder_state=decoder.initial_state,
+                  embeddings=embedding,
+                  end_of_sequence_id=done_token,
+                  maximum_length=max_steps,
+                  num_decoder_symbols=num_classes,
+                  decoder=decoder,
+                  dtype=tf.int32)
+
+    (decoder_outputs_inference, decoder_state_inference,
+      decoder_context_state_inference) = (tf.contrib.seq2seq.dynamic_rnn_decoder(
+               cell=cell,
+               decoder_fn=decoder_fn_inference,
+               scope=scope))
+
+    score = decoder.logprobs_finished_beams
+    path = decoder_context_state_inference
+
+    if prob_as_score:
+      score = tf.exp(score)
+    return path, score
   
 

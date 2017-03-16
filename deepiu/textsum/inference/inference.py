@@ -20,6 +20,7 @@ FLAGS = flags.FLAGS
 #flags.DEFINE_string('model_dir', '/home/gezi/temp/textsum/model.seq2seq.attention/', '')
 flags.DEFINE_string('model_dir', '/home/gezi/temp/textsum/model.seq2seq/', '')
 flags.DEFINE_string('vocab', '/home/gezi/temp/textsum/tfrecord/seq-basic.10w/train/vocab.txt', 'vocabulary file')
+flags.DEFINE_boolean('debug', False, '')
 
 import sys, os, math
 import gezi, melt
@@ -47,6 +48,11 @@ def predict(predictor, input_text):
   print('word_ids', word_ids, 'len:', len(word_ids))
   print(text2ids.ids2text(word_ids))
 
+  #tf.while_loop has debug problem ValueError: Causality violated in timing relations of debug dumps: seq2seq/main/decode_4/dynamic_rnn_decoder/rnn/while/Merge_7 (1489649052260629): these input(s) are not satisfied: [(u'seq2seq/main/decode_4/dynamic_rnn_decoder/rnn/while/Enter_7', 0), (u'seq2seq/main/decode_4/dynamic_rnn_decoder/rnn/while/NextIteration_7', 0)
+  #https://github.com/tensorflow/tensorflow/issues/8337 From your error message, it appears that you are using tf.while_loop. Can you try setting its paralle_iterations parameter to 1 and see if the error still happens?
+  #There may be a bug in how tfdbg handles while_loops with parallel_iterations > 1.
+  #I think it might be a GPU thing.
+  #The example below errors if run as python tf_8337_minimal.py but is fine is run as CUDA_VISIBLE_DEVICES=-1 
   timer = gezi.Timer()
   text, score = predictor.inference(['text', 'text_score'], 
                                     feed_dict= {
@@ -86,15 +92,15 @@ def predicts(predictor, input_texts):
 
 def main(_):
   text2ids.init()
-  predictor = melt.Predictor(FLAGS.model_dir)
+  predictor = melt.Predictor(FLAGS.model_dir, debug=FLAGS.debug)
   
   #predict(predictor, "任达华传授刘德华女儿经 赞停工陪太太(图)")
   #predict(predictor, "王凯整容了吗_王凯整容前后对比照片")
   #predict(predictor, "大小通吃汉白玉霸王貔貅摆件 正品开光镇宅招财")
   #predict(predictor, "学生迟到遭老师打 扇耳光揪头发把头往墙撞致3人住院")
-  predict(predictor, "宝宝太胖怎么办呢")
-  predict(predictor, "包邮买二送一性感女内裤低腰诱惑透视蕾丝露臀大蝴蝶三角内裤女夏-淘宝网")
-  predict(predictor, "蛋龟缸，目前4虎纹1剃刀")
+  #predict(predictor, "宝宝太胖怎么办呢")
+  #predict(predictor, "包邮买二送一性感女内裤低腰诱惑透视蕾丝露臀大蝴蝶三角内裤女夏-淘宝网")
+  #predict(predictor, "蛋龟缸，目前4虎纹1剃刀")
   #predict(predictor, "大棚辣椒果实变小怎么办,大棚辣椒果实变小防治措施")
   #predict(predictor, "宝宝太胖怎么办呢")
   predict(predictor, "大棚辣椒果实变小怎么办,大棚辣椒果实变小防治措施")

@@ -90,6 +90,4 @@ class RnnEncoder(Encoder):
           encode_method=FLAGS.rnn_method,
           output_method=output_method)
 
-    tf.add_to_collection('encode_feature', encode_feature)
-    #tf.add_to_collection('encode_state', state)
     return encode_feature, state

@@ -95,12 +95,19 @@ def main(_):
 
     timer = gezi.Timer()
     print(tf.get_collection('encode_state'), len(tf.get_collection('encode_state')))
-    texts, scores,  atkeys  = sess.run([beam_text, beam_score, 
-                                             tf.get_collection('attention_keys')[0]
+    texts, scores, state, input_ , atkeys, atvalues = sess.run([beam_text, beam_score, 
+                                             tf.get_collection('seq2seq_encode_state')[0],
+                                             tf.get_collection('seq2seq_input')[0],
+                                             tf.get_collection('attention_keys')[0],
+                                             tf.get_collection('attention_values')[0],
                                              ], 
                                             {predictor.input_text_feed : [word_ids]})
 
+    #print(state)
+    #print(input_)
+
     print(atkeys)
+    #print(atvalues)
 
     texts = texts[0]
     scores = scores[0]
@@ -121,13 +128,19 @@ def main(_):
 
   word_ids_list = [_text2ids(input_text, INPUT_TEXT_MAX_WORDS) for input_text in input_texts]
   timer = gezi.Timer()
-  texts_list, scores_list, atkeys = sess.run([beam_text, beam_score, 
-                                             tf.get_collection('attention_keys')[0]
+  texts_list, scores_list, state, input_, atkeys, atvalues = sess.run([beam_text, beam_score, 
+                                             tf.get_collection('seq2seq_encode_state')[0],
+                                             tf.get_collection('seq2seq_input')[0],
+                                             tf.get_collection('attention_keys')[0],
+                                             tf.get_collection('attention_values')[0],
                                              ], 
                              feed_dict={predictor.input_text_feed: word_ids_list})
   
+  #print(state)
+  #print(input_)
   print(atkeys)
   print(np.shape(atkeys))
+  #print(atvalues)
 
   for texts, scores in zip(texts_list, scores_list):
     for text, score in zip(texts, scores):

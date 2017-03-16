@@ -210,7 +210,7 @@ def train_once(sess,
         except Exception:
           train_once.summary_op = tf.merge_all_summaries()
 
-        melt.print_summary_ops()
+        #melt.print_summary_ops()
 
         try:
           train_once.summary_train_op = tf.summary.merge_all(key=melt.MonitorKeys.TRAIN)

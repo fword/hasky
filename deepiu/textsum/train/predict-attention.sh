@@ -41,6 +41,8 @@ python ./train.py \
   --seg_method $online_seg_method \
   --feed_single $feed_single \
   --seq_decode_method 0 \
+  --beam_size 1 \
+  --decode_max_words 1 \
   --dynamic_batch_length 1 \
   --rnn_method 0 \
   --emb_dim 1000 \

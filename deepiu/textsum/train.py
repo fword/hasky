@@ -168,10 +168,8 @@ def gen_validate(input_app, input_results, trainer, predictor):
 def gen_predict_graph(predictor):  
   exact_score = predictor.init_predict(exact_loss=True)
   tf.add_to_collection('exact_score', exact_score)
-  print('----------exact_score', exact_score)
 
   exact_prob = predictor.init_predict(exact_prob=True)
-  print('----------exact_prob', exact_prob)
   tf.add_to_collection('exact_prob', exact_prob)
 
   #put to last since evaluate use get collection from 'scores'[-1]
@@ -179,7 +177,7 @@ def gen_predict_graph(predictor):
   tf.add_to_collection('score', score)
 
   #-----generateive
-  print('--------------beam_size', FLAGS.beam_size)
+  print('beam_size', FLAGS.beam_size)
   init_predict_text = functools.partial(predictor.init_predict_text, 
                                         beam_size=FLAGS.beam_size, 
                                         convert_unk=False)
@@ -268,7 +266,7 @@ def train_process(trainer, predictor=None):
                              feed_dict={'seq2seq/model_init_1/input_text:0' : [word_ids]})
       print(texts[0], text2ids.ids2text(texts[0]), scores[0])
 
-      texts, scores = sess.run([beam_text, beam_text_score], 
+      texts, scores  = sess.run([beam_text, beam_text_score], 
                                feed_dict={predictor.input_text_feed: [word_ids]})
 
       texts = texts[0]
@@ -277,17 +275,19 @@ def train_process(trainer, predictor=None):
         print(text, text2ids.ids2text(text), score)
     
     input_texts = [
+                   '大棚辣椒果实变小怎么办,大棚辣椒果实变小防治措施',
+                   #'包邮买二送一性感女内裤低腰诱惑透视蕾丝露臀大蝴蝶三角内裤女夏-淘宝网',
                    "宝宝太胖怎么办呢",
                    '大棚辣椒果实变小怎么办,大棚辣椒果实变小防治措施',
                    #'大棚辣椒果实变小怎么办,大棚辣椒果实变小防治措施',
-                   '包邮买二送一性感女内裤低腰诱惑透视蕾丝露臀大蝴蝶三角内裤女夏-淘宝网',
-                   '邹红建是阿拉斯加',
+                   #'邹红建是阿拉斯加',
                    ]
 
     word_ids_list = [_text2ids(input_text, INPUT_TEXT_MAX_WORDS) for input_text in input_texts]
     timer = gezi.Timer()
     texts_list, scores_list = sess.run([beam_text, beam_text_score], 
                                feed_dict={predictor.input_text_feed: word_ids_list})
+    
     for texts, scores in zip(texts_list, scores_list):
       for text, score in zip(texts, scores):
         print(text, text2ids.ids2text(text), score, math.log(score))

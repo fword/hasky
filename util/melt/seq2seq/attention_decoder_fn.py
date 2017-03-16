@@ -288,6 +288,7 @@ def attention_decoder_fn_inference(output_fn,
         attention = init_attention(encoder_state)
       else:
         # construct attention
+        #NOTICE since dynamic.. below attention_construct_fn will be called building graph for only once
         attention = attention_construct_fn(cell_output, attention_keys,
                                            attention_values)
         cell_output = attention
@@ -392,14 +393,15 @@ def _create_attention_construct_fn(name, num_units, attention_score_fn, reuse):
     attention_construct_fn: to build attention states.
   """
   with variable_scope.variable_scope(name, reuse=reuse) as scope:
-
     def construct_fn(attention_query, attention_keys, attention_values):
-      context = attention_score_fn(attention_query, attention_keys,
-                                   attention_values)
-      concat_input = array_ops.concat([attention_query, context], 1)
-      attention = layers.linear(
-          concat_input, num_units, biases_initializer=None, scope=scope)
-      return attention
+        context = attention_score_fn(attention_query, attention_keys,
+                                     attention_values)
+        concat_input = array_ops.concat([attention_query, context], 1)
+        #notice here pass scope which is outside construct_fn func! so always not affected by using env scope, be like
+        #seq2seq/main/decode/attention_construct/weights in rnn_decoder.py not seq2seq/main/decode/rnn/loop_function/weights in beam_decoder.py
+        attention = layers.linear(
+            concat_input, num_units, biases_initializer=None, scope=scope)
+        return attention
 
     return construct_fn
 

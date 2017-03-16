@@ -60,7 +60,6 @@ flags.DEFINE_integer('monitor_level', 2, '1 will monitor emb, 2 will monitor gra
 flags.DEFINE_boolean('no_log', False, '')
 flags.DEFINE_string('mode', 'train', 'or predict')
 
-
 #----------multi gpu
 flags.DEFINE_integer('num_gpus', 0, """How many GPUs to use. set 0 to disable multi gpu mode""")
 tf.app.flags.DEFINE_boolean('log_device_placement', False, """Whether to log device placement.""")
@@ -71,6 +70,7 @@ flags.DEFINE_boolean('add_global_scope', True, '''default will add global scope 
 flags.DEFINE_string('global_scope', '', '')
 flags.DEFINE_string('main_scope', 'main', 'or use other main_scope like run, this is mainly graph scope for varaible reuse')
 
+from tensorflow.python import debug as tf_debug
 
 __pacage__ = None 
 from six.moves import xrange  # pylint: disable=redefined-builti
@@ -79,7 +79,6 @@ import melt
 #or from melt.utils import logging
 import melt.utils.logging as logging
 #import logging
-
 
 def gen_learning_rate():
   #TODO if app crash reload then we should set smaller learning rate, may adgrad can combine with exponential_decay ?
@@ -114,7 +113,13 @@ def train_flow(ops,
                num_steps_per_epoch=None,
                model_dir=None, 
                metric_eval_function=None, 
+               debug=False,
                sess=None):
+
+  if sess is None:
+    sess = melt.get_session()
+  if debug:
+    sess = tf_debug.LocalCLIDebugWrapperSession(sess)
 
   #batch size right now not define here, but in app code like input_app.py
   melt.set_global('batch_size', FLAGS.batch_size)

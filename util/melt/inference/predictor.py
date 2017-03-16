@@ -17,8 +17,7 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
-flags = tf.app.flags
-FLAGS = flags.FLAGS
+from tensorflow.python import debug as tf_debug
 
 import os, sys
 
@@ -35,9 +34,11 @@ def get_model_dir_and_path(model_dir, model_name=None):
   return os.path.dirname(model_path), model_path
 
 class Predictor(object):
-  def __init__(self, model_dir=None, meta_graph=None, model_name=None):
+  def __init__(self, model_dir=None, meta_graph=None, model_name=None, debug=False):
     super(Predictor, self).__init__()
     self.sess = tf.InteractiveSession()
+    if debug:
+      self.sess = tf_debug.LocalCLIDebugWrapperSession(self.sess)
     #ops will be map and internal list like
     #{ text : [op1, op2], text2 : [op3, op4, op5], text3 : [op6] }
     if model_dir is not None:

@@ -269,8 +269,9 @@ class RnnDecoder(Decoder):
                     num_decoder_symbols=self.vocab_size,
                     dtype=tf.int32)
     else:
+      #dynamic loop do not need to consider scope problem since attention construct will only do once
       attention_keys, attention_values, attention_score_fn, attention_construct_fn = \
-      self.prepare_attention(attention_states)
+        self.prepare_attention(attention_states)
       decoder_fn_inference = (
           melt.seq2seq.attention_decoder_fn_inference(
               output_fn=output_fn,
@@ -309,12 +310,8 @@ class RnnDecoder(Decoder):
     if emb is None:
       emb = self.emb
 
-    def loop_function(i, step_result):
-      if len(step_result) == 3:
-        prev, state, attention = step_result
-      else:
-        prev, state = step_result
-        attention = None
+    def loop_function(i, prev, state, decoder):
+      prev, state, attention = decoder.take_step(i, prev, state)
 
       logit_symbols = tf.nn.embedding_lookup(emb, prev)
       if attention is not None:
@@ -325,12 +322,17 @@ class RnnDecoder(Decoder):
 
     state = self.cell.zero_state(tf.shape(input)[0], tf.float32) if initial_state is None else initial_state
     
-    #---TODO: dynamic beam decode not ok right now
+    #NOTICE since not dynamic, need to reuse... scope for the second time construct attention
+    #hack here force using one time before and set reuse TODO for attention_decoder_fn.py seems to be written for dyanmic purpose?
+    #if not use this you must also manualy first build graph of generate_sequence_greedy 
+    self.generate_sequence_greedy(input, max_words, initial_state, attention_states, convert_unk, emb)
+    tf.get_variable_scope().reuse_variables()
+
     attention_keys, attention_values, attention_score_fn, attention_construct_fn = None, None, None, None
     if attention_states is not None:
       attention_keys, attention_values, attention_score_fn, attention_construct_fn = \
         self.prepare_attention(attention_states)
-
+        
     #TODO to be safe make topn the same as beam size
     return melt.seq2seq.beam_decode(input, max_words, state, 
                                     self.cell, loop_function, scope=self.scope,
@@ -356,6 +358,10 @@ class RnnDecoder(Decoder):
     """
     if emb is None:
       emb = self.emb
+
+    #same reason, ref to generate_sequence_beam
+    self.generate_sequence_greedy(input, max_words, initial_state, attention_states, convert_unk, emb)
+    tf.get_variable_scope().reuse_variables()
 
     if attention_states is not None:
        attention_keys, attention_values, attention_score_fn, attention_construct_fn = \
@@ -475,7 +481,6 @@ class RnnDecoder(Decoder):
     start_input = self.get_start_input(batch_size)
     start_embedding_input = tf.nn.embedding_lookup(emb, start_input) 
     return start_embedding_input
-
 
   def normalize_length(self, loss, sequence_length, exact_prob=False):
     sequence_length = tf.cast(sequence_length, tf.float32)

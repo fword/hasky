@@ -12,6 +12,7 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
+from tensorflow.python import debug as tf_debug
 
 import sys, os, glob
 import gezi
@@ -34,7 +35,7 @@ optimizers = {
   'adagrad' : tf.train.AdagradOptimizer
   }
 
-def get_session(log_device_placement=False, allow_soft_placement=True):
+def get_session(log_device_placement=False, allow_soft_placement=True, debug=False):
   if not hasattr(get_session, 'sess') or get_session.sess is None:
     config=tf.ConfigProto(
       allow_soft_placement=allow_soft_placement, 
@@ -43,6 +44,8 @@ def get_session(log_device_placement=False, allow_soft_placement=True):
     #NOTICE https://github.com/tensorflow/tensorflow/issues/2130 but 5000 will cause init problem!
     #config.operation_timeout_in_ms=50000   # terminate on long hangs
     get_session.sess = tf.Session(config=config)
+    if debug:
+      get_session.sess = tf_debug.LocalCLIDebugWrapperSession(get_session.sess)
   return get_session.sess
 
 def get_optimizer(name):
