@@ -36,6 +36,13 @@ optimizers = {
   }
 
 def get_session(log_device_placement=False, allow_soft_placement=True, debug=False):
+  """
+  TODO FIXME get_session will casue  at last
+#Exception UnboundLocalError: "local variable 'status' referenced before assignment" in <bound method Session.__del__ of <tensorflow.python.client.session.Session object at 0x858af10>> ignored
+#TRACE: 03-17 08:22:26:   * 0 [clear]: tag init stat error
+
+global or inside function global sess will cause this but not big problem for convenience just accpet right now
+  """
   if not hasattr(get_session, 'sess') or get_session.sess is None:
     config=tf.ConfigProto(
       allow_soft_placement=allow_soft_placement, 

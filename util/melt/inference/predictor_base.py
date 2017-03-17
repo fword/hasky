@@ -15,15 +15,20 @@ import tensorflow as tf
 import melt
 
 class PredictorBase(object):
-  def __init__(self):
+  def __init__(self, sess=None):
     super(PredictorBase, self).__init__()
-    self.sess = melt.get_session()
+    if sess is None:
+      self.sess = melt.get_session()
+    else:
+      self.sess = sess
 
-  def load(self, model_dir, var_list=None, model_name=None):
+  def load(self, model_dir, var_list=None, model_name=None, sess = None):
     """
     only load varaibels from checkpoint file, you need to 
     create the graph before calling load
     """
+    if sess is not None:
+      self.sess = sess
     self.model_path = melt.get_model_path(model_dir, model_name)
     saver = melt.restore_from_path(self.sess, self.model_path, var_list)
     return self.sess
@@ -31,11 +36,13 @@ class PredictorBase(object):
   def restore_from_graph(self):
     pass
 
-  def restore(self, model_dir, model_name=None):
+  def restore(self, model_dir, model_name=None, sess=None):
     """
     do not need to create graph
     restore graph from meta file then restore values from checkpoint file
     """
+    if sess is not None:
+      self.sess = sess
     self.model_path = model_path = melt.get_model_path(model_dir, model_name)
     meta_filename = '%s.meta'%model_path
     saver = tf.train.import_meta_graph(meta_filename)

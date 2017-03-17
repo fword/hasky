@@ -73,7 +73,10 @@ def main(_):
                                                           beam_size=FLAGS.beam_size,
                                                           convert_unk=False)  
 
-  predictor.load(FLAGS.model_dir) 
+  predictor.load(FLAGS.model_dir, sess=sess) 
+
+  for item in tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES):
+    print(item)
   #input_text = "王凯整容了吗_王凯整容前后对比照片"
   input_texts = [
                  #'包邮买二送一性感女内裤低腰诱惑透视蕾丝露臀大蝴蝶三角内裤女夏-淘宝网',
@@ -95,19 +98,15 @@ def main(_):
 
     timer = gezi.Timer()
     print(tf.get_collection('encode_state'), len(tf.get_collection('encode_state')))
-    texts, scores, state, input_ , atkeys, atvalues = sess.run([beam_text, beam_score, 
-                                             tf.get_collection('seq2seq_encode_state')[0],
-                                             tf.get_collection('seq2seq_input')[0],
+    texts, scores,  atkeys, atvals  = sess.run([beam_text, beam_score, 
                                              tf.get_collection('attention_keys')[0],
                                              tf.get_collection('attention_values')[0],
                                              ], 
                                             {predictor.input_text_feed : [word_ids]})
 
-    #print(state)
-    #print(input_)
-
     print(atkeys)
-    #print(atvalues)
+    print(atvals)
+    print(np.shape(atkeys), np.shape(atvals))
 
     texts = texts[0]
     scores = scores[0]
@@ -118,8 +117,8 @@ def main(_):
 
   input_texts = [
                  '大棚辣椒果实变小怎么办,大棚辣椒果实变小防治措施',
-                 #'包邮买二送一性感女内裤低腰诱惑透视蕾丝露臀大蝴蝶三角内裤女夏-淘宝网',
-                 '包邮买二送一性感女内裤低腰诱惑透视蕾丝露臀大蝴蝶',
+                 '包邮买二送一性感女内裤低腰诱惑透视蕾丝露臀大蝴蝶三角内裤女夏-淘宝网',
+                 #'包邮买二送一性感女内裤低腰诱惑透视蕾丝露臀大蝴蝶', #same length as lajiao sentence 15
                  #"宝宝太胖怎么办呢",
                  #'大棚辣椒果实变小怎么办,大棚辣椒果实变小防治措施',
                  #'大棚辣椒果实变小怎么办,大棚辣椒果实变小防治措施',
@@ -128,25 +127,40 @@ def main(_):
 
   word_ids_list = [_text2ids(input_text, INPUT_TEXT_MAX_WORDS) for input_text in input_texts]
   timer = gezi.Timer()
-  texts_list, scores_list, state, input_, atkeys, atvalues = sess.run([beam_text, beam_score, 
-                                             tf.get_collection('seq2seq_encode_state')[0],
-                                             tf.get_collection('seq2seq_input')[0],
+  texts_list, scores_list, atkeys2, atvals2, weights = sess.run([beam_text, beam_score, 
                                              tf.get_collection('attention_keys')[0],
                                              tf.get_collection('attention_values')[0],
+                                             'seq2seq/main/decode/attention_keys/weights:0'
                                              ], 
                              feed_dict={predictor.input_text_feed: word_ids_list})
   
-  #print(state)
-  #print(input_)
-  print(atkeys)
-  print(np.shape(atkeys))
-  #print(atvalues)
-
-  for texts, scores in zip(texts_list, scores_list):
-    for text, score in zip(texts, scores):
-      print(text, text2ids.ids2text(text), score, math.log(score))
+  print(atkeys2)
+  print(atvals2[0])
+  print(np.shape(atkeys2), np.shape(atvals2))
 
   print('beam_search using time(ms):', timer.elapsed_ms())
+
+  weights = tf.constant(weights)
+  values = tf.get_collection('attention_values')[0]
+
+  values = tf.squeeze(values[0])
+  zeros = tf.zeros_like(values[:5,:])
+
+  values2 = tf.concat([values, zeros], 0)
+
+  values = tf.cast(values, tf.float64)
+  values2 = tf.cast(values2, tf.float64)
+  weights = tf.cast(weights, tf.float64)
+  result1 = tf.matmul(values, weights)
+  result2 = tf.matmul(values2, weights)
+
+  result1_, result2_ = sess.run([result1, result2], feed_dict={predictor.input_text_feed: [word_ids]})
+  #result2 = sess.run(result, feed_dict={predictor.input_text_feed: word_ids_list})
+
+  print(result1_)
+  print(result2_)
+
+
 
 if __name__ == '__main__':
   tf.app.run()

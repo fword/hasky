@@ -198,7 +198,9 @@ class BeamDecoder():
     #---for debug
     if self.attention_construct_fn:
       tf.add_to_collection('attention_keys', self.attention_keys)
+      print('attention_keys', self.attention_keys)
       tf.add_to_collection('attention_values', self.attention_values)
+      print('attention_values', self.attention_values)
                       
   def tile_along_beam(self, tensor):
     """

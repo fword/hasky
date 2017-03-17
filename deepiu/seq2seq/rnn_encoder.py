@@ -72,10 +72,10 @@ class RnnEncoder(Encoder):
                                      start_id=(vocabulary.vocab.start_id() if FLAGS.encode_start_mark else None),
                                      end_id=(self.end_id if FLAGS.encode_end_mark else None))
     
-    if self.is_predict:
-      #---only need when predict, since train input already dynamic length, NOTICE this will improve speed a lot
-      num_steps = tf.cast(tf.reduce_max(sequence_length), dtype=tf.int32)
-      sequence = tf.slice(sequence, [0,0], [-1, num_steps])   
+    #for attention due to float32 numerice accuracy problem, may has some diff, so not slice it
+    #if self.is_predict:
+    #  num_steps = tf.cast(tf.reduce_max(sequence_length), dtype=tf.int32)
+    #  sequence = tf.slice(sequence, [0,0], [-1, num_steps])   
     
     inputs = tf.nn.embedding_lookup(emb, sequence) 
     if self.is_training and FLAGS.keep_prob < 1:

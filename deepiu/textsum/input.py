@@ -41,8 +41,10 @@ def _decode(example, parse, dynamic_batch_length):
   maxlen = 0 if dynamic_batch_length else TEXT_MAX_WORDS
   text = melt.sparse_tensor_to_dense(text, maxlen)
   
-  input_maxlen = 0 if dynamic_batch_length else INPUT_TEXT_MAX_WORDS
-  input_text = melt.sparse_tensor_to_dense(input_text, maxlen)
+  #for attention to be numeric stabel and since encoding not affect speed, dynamic rnn encode just pack zeros at last
+  #input_maxlen = 0 if dynamic_batch_length else INPUT_TEXT_MAX_WORDS
+  input_maxlen = INPUT_TEXT_MAX_WORDS
+  input_text = melt.sparse_tensor_to_dense(input_text, input_maxlen)
 
   text_str = features['text_str']
   input_text_str = features['{}_str'.format(input_type)]

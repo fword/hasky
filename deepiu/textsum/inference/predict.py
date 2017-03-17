@@ -73,13 +73,16 @@ def main(_):
                                                           beam_size=FLAGS.beam_size,
                                                           convert_unk=False)  
 
-  predictor.load(FLAGS.model_dir) 
+  predictor.load(FLAGS.model_dir, sess=sess) 
+
+  for item in tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES):
+    print(item)
   #input_text = "王凯整容了吗_王凯整容前后对比照片"
   input_texts = [
                  #'包邮买二送一性感女内裤低腰诱惑透视蕾丝露臀大蝴蝶三角内裤女夏-淘宝网',
                  #'大棚辣椒果实变小怎么办,大棚辣椒果实变小防治措施',
                  #'宝宝太胖怎么办呢',
-                 #'蛋龟缸，目前4虎纹1剃刀',
+                 '蛋龟缸，目前4虎纹1剃刀',
                  '大棚辣椒果实变小怎么办,大棚辣椒果实变小防治措施',
                  ]
 
@@ -94,21 +97,14 @@ def main(_):
     #print(text_[0], text2ids.ids2text(text_[0]), score_[0], 'time(ms):', timer.elapsed_ms())
 
     timer = gezi.Timer()
-    print(tf.get_collection('encode_state'), len(tf.get_collection('encode_state')))
-    texts, scores,  atkeys, atvals  = sess.run([beam_text, beam_score, 
-                                             tf.get_collection('attention_keys')[0],
-                                             tf.get_collection('attention_values')[0],
-                                             ], 
+    texts, scores = sess.run([beam_text, beam_score], 
                                             {predictor.input_text_feed : [word_ids]})
 
-    print(atkeys)
-    print(atvals)
-    print(np.shape(atkeys), np.shape(atvals))
 
     texts = texts[0]
     scores = scores[0]
     for text_, score_ in zip(texts, scores):
-      print(text_, text2ids.ids2text(text_), score_)
+      print(text_, text2ids.ids2text(text_), score_, math.log(score_))
 
     print('beam_search using time(ms):', timer.elapsed_ms())
 
@@ -124,21 +120,17 @@ def main(_):
 
   word_ids_list = [_text2ids(input_text, INPUT_TEXT_MAX_WORDS) for input_text in input_texts]
   timer = gezi.Timer()
-  texts_list, scores_list, atkeys, atvals = sess.run([beam_text, beam_score, 
-                                             tf.get_collection('attention_keys')[0],
-                                             tf.get_collection('attention_values')[0]
-                                             ], 
+  texts_list, scores_list = sess.run([beam_text, beam_score], 
                              feed_dict={predictor.input_text_feed: word_ids_list})
   
-  print(atkeys)
-  print(atvals)
-  print(np.shape(atkeys), np.shape(atvals))
 
   for texts, scores in zip(texts_list, scores_list):
     for text, score in zip(texts, scores):
       print(text, text2ids.ids2text(text), score, math.log(score))
 
   print('beam_search using time(ms):', timer.elapsed_ms())
+
+
 
 if __name__ == '__main__':
   tf.app.run()

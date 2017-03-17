@@ -85,8 +85,7 @@ def fully_connected(inputs,
   #with variable_scope.variable_scope(
   #  scope, 'Mlp', [inputs],
   #  reuse=reuse) as vs:
-  scope = 'fully_connected' if scope is None else scope
-  with tf.variable_scope(scope):
+  with tf.variable_scope(scope, 'fully_connected'):
     is_dense_input = True if isinstance(inputs, tf.Tensor) else False
     dtype=inputs.dtype.base_dtype if is_dense_input else inputs[1].values.dtype.base_dtype
     #sparse input must tell input_dim
@@ -98,7 +97,7 @@ def fully_connected(inputs,
 
     #-----------deal first hidden
     if is_dense_input:
-     w_h =  tf.get_variable('weight_hidden',
+     w_h =  tf.get_variable('weights',
                             shape=[input_dim, num_outputs],
                             initializer=weights_initializer,
                             regularizer=weights_regularizer,
@@ -106,7 +105,7 @@ def fully_connected(inputs,
                             trainable=trainable)
     else:
      with tf.device('/cpu:0'):
-       w_h =  tf.get_variable('weight_hidden',
+       w_h =  tf.get_variable('weights',
                               shape=[input_dim, num_outputs],
                               initializer=weights_initializer,
                               regularizer=weights_regularizer,
@@ -114,7 +113,7 @@ def fully_connected(inputs,
                               trainable=trainable)
 
     if use_bias:
-     b_h = tf.get_variable('bias_hidden',
+     b_h = tf.get_variable('biases',
                            shape=[num_outputs,],
                            initializer=biases_initializer,
                            regularizer=biases_regularizer,
