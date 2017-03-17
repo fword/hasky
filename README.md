@@ -1,4 +1,8 @@
-tensorflow/pytorch related work(nlp and image related, text classification, image caption, seq2seq..)   
+#tensorflow related work(nlp and image related, text classification, image caption, seq2seq..)  
+mainly tf work, may do some pytorch related  
+<div align="center">
+  <img src="http://images2015.cnblogs.com/blog/61573/201703/61573-20170318072357307-769598909.png"><br><br>
+</div>
 
 ## incase not find dependence, make sure set PYTHONPATH to include tensorflow_exp/util so we can find gezi and melt
 ##./applications/ 
