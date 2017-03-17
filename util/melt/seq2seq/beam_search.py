@@ -23,7 +23,7 @@ from gezi import TopN
 class BeamSearchState(object):
   """Represents a complete or partial beam search state."""
 
-  def __init__(self, words, state, logprob, score, logprobs, metadata=None):
+  def __init__(self, words, state, logprob, score, logprobs, alignments_list, metadata=None):
     """Initializes the Caption.
 
     Args:
@@ -39,6 +39,7 @@ class BeamSearchState(object):
     self.logprob = logprob
     self.score = score
     self.logprobs = logprobs
+    self.alignments_list = alignments_list
     self.metadata = metadata
 
   def __cmp__(self, other):
@@ -81,7 +82,14 @@ def beam_search(init_states,
   # Feed in the image to get the initial state.
   #TODO right now ingraph beam size must here equal to out graph beam size..
 
-  initial_state, ids, logprobs, beam_size = init_states
+  if len(init_states) == 4:
+    beam_size, initial_state, ids, logprobs = init_states
+    initial_alignments = []
+  else:
+    beam_size, initial_state, ids, logprobs, initial_alignments = init_states
+    assert initial_alignments is not None
+    initial_alignments = [initial_alignments[0]]
+
   partial_beams = TopN(beam_size)
   complete_beams = TopN(beam_size)
   for id, logprob in zip(ids[0], logprobs[0]):
@@ -94,9 +102,11 @@ def beam_search(init_states,
         logprob=logprob,
         score=logprob,
         logprobs=[logprob],
+        alignments_list=initial_alignments, #[] or [..]
         metadata=[""])
       partial_beams.push(beam)
 
+  #print('init', np.shape(initial_alignments))
   # Run beam search. max_words not - 1 for we wil consider <Done> as an additional step
   for _ in range(max_words):
     partial_beams_list = partial_beams.extract()
@@ -104,9 +114,21 @@ def beam_search(init_states,
     input_feed = np.array([c.words[-1] for c in partial_beams_list])
     state_feed = np.array([c.state for c in partial_beams_list])
 
-    state, ids, logprobs = step_func(input_feed, state_feed)
+    step_result = step_func(input_feed, state_feed)
 
+    if len(step_result) == 3:
+      state, ids, logprobs = step_result
+      alignments = None
+    else:
+      state, ids, logprobs, alignments = step_result
+      assert alignments is not None 
+
+    #print('then', np.shape(alignments))
     for i, partial_beam in enumerate(partial_beams_list):
+      alignments_list = partial_beam.alignments_list
+      if alignments is not None: 
+        alignments_list = alignments_list + [alignments[i]] 
+      
       for w, p in zip(ids[i], logprobs[i]):
         words = partial_beam.words + [w]
         logprob = partial_beam.logprob + p
@@ -121,10 +143,12 @@ def beam_search(init_states,
         if w == end_id:
           if length_normalization_factor > 0:
             score /= len(words)**length_normalization_factor
-          beam = BeamSearchState(words, state[i], logprob, score, logprob_list, metadata_list)
+          beam = BeamSearchState(words, state[i], logprob, score,
+                                 logprob_list, alignments_list, metadata_list)
           complete_beams.push(beam)
         else:
-          beam = BeamSearchState(words, state[i], logprob, score, logprob_list, metadata_list)
+          beam = BeamSearchState(words, state[i], logprob, score, 
+                                 logprob_list, alignments_list, metadata_list)
           partial_beams.push(beam)
 
     if partial_beams.size() == 0:

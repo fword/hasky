@@ -1,7 +1,6 @@
 source ./config 
 
-python ./inference/inference-outgraph.py \
+python ./inference/inference-outgraph-attention.py \
       --model_dir /home/gezi/temp/textsum/model.seq2seq.attention/ \
-      --decode_max_words 10 \
       --seg_method $online_seg_method \
       --feed_single $feed_single 

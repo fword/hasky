@@ -27,9 +27,10 @@ from conf import TEXT_MAX_WORDS, ENCODE_UNK
 vocab = None 
 Segmentor = None 
 
-def init():
+def init(vocab_path=None):
   global vocab, Segmentor
   if vocab is None:
+    vocabulary.init(vocab_path)
     print('ENCODE_UNK', ENCODE_UNK, file=sys.stderr)
     vocab = vocabulary.get_vocab()
     Segmentor = gezi.Segmentor()
@@ -71,7 +72,7 @@ def text2ids(text, seg_method='default', feed_single=False, allow_all_zero=False
 
   return word_ids
 
-def ids2words(text_ids):
+def ids2words(text_ids, print_end=True):
   #print('@@@@@@@@@@text_ids', text_ids)
   #NOTICE int64 will be ok
 #  Boost.Python.ArgumentError: Python argument types in
@@ -88,6 +89,8 @@ def ids2words(text_ids):
         word = vocab.key(int(id))
         words.append(word)
       else:
+        if print_end:
+          words.append('<EOS>')
         break
     else:
       break

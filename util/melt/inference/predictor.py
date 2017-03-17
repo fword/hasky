@@ -33,6 +33,16 @@ def get_model_dir_and_path(model_dir, model_name=None):
   #  raise ValueError(model_path)
   return os.path.dirname(model_path), model_path
 
+def get_tensor_from_key(key, index=-1):
+  if isinstance(key, str):
+    try:
+      return tf.get_collection(key)[index]
+    except Exception:
+      print('Warning:', key, ' not find in graph')
+      return tf.no_op()
+  else:
+    return key
+
 class Predictor(object):
   def __init__(self, model_dir=None, meta_graph=None, model_name=None, debug=False):
     super(Predictor, self).__init__()
@@ -44,20 +54,26 @@ class Predictor(object):
     if model_dir is not None:
       self.restore(model_dir, meta_graph, model_name)
 
-  def inference(self, key, feed_dict=None, index=0):
+  def inference(self, key, feed_dict=None, index=-1):
+    """
+    use -1 not 0!
+    """
     if not isinstance(key, (list, tuple)):
-      return self.sess.run(tf.get_collection(key)[index], feed_dict=feed_dict)
+      return self.sess.run(get_tensor_from_key(key, index), feed_dict=feed_dict)
     else:
       keys = key 
       if not isinstance(index, (list, tuple)):
         indexes = [index] * len(keys)
       else:
         indexes = index 
-      keys = [tf.get_collection(key)[index] for key,index in zip(keys, indexes)]
+      keys = [get_tensor_from_key(key, index) for key,index in zip(keys, indexes)]
       return self.sess.run(keys, feed_dict=feed_dict)
 
   def predict(self, key, feed_dict=None, index=0):
     return self.inference(key, feed_dict, index)
+
+  def run(self, key, feed_dict=None):
+    return self.sess.run(key, feed_dict)
 
   def restore(self, model_dir, meta_graph=None, model_name=None, random_seed=None):
     """

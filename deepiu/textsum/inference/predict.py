@@ -16,7 +16,7 @@ import tensorflow as tf
 flags = tf.app.flags
 FLAGS = flags.FLAGS
   
-flags.DEFINE_string('model_dir', '/home/gezi/temp/textsum/model.seq2seq.attention/', '')
+flags.DEFINE_string('model_dir', '/home/gezi/temp/textsum/model.seq2seq', '')
 
 flags.DEFINE_string('algo', 'seq2seq', 'default algo is bow(cbow), also support rnn, show_and_tell, TODO cnn')
 

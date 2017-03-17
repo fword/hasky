@@ -447,11 +447,12 @@ def _create_attention_score_fn(name,
   Returns:
     attention_score_fn: to compute similarity between key and target states.
   """
-  with variable_scope.variable_scope(name, reuse=reuse):
+  with variable_scope.variable_scope(name, reuse=reuse) as scope:
     if attention_option == "bahdanau":
       query_w = variable_scope.get_variable(
           "attnW", [num_units, num_units], dtype=dtype)
       score_v = variable_scope.get_variable("attnV", [num_units], dtype=dtype)
+      scope.reuse_variables()
 
     def attention_score_fn(query, keys, values):
       """Put attention masks on attention_values using attention_keys and query.
@@ -492,6 +493,10 @@ def _create_attention_score_fn(name,
       #   alignments: [batch_size, length]
       # TODO(thangluong): not normalize over padding positions.
       alignments = nn_ops.softmax(scores)
+
+      tf.add_to_collection('attention_alignments', alignments)
+      #will show 2 times since in outgraph decoding, first time you pass batch_size 1 then batch_size beam_size
+      print('attention_alignments', tf.get_collection('attention_alignments'))
 
       # Now calculate the attention-weighted vector.
       alignments = array_ops.expand_dims(alignments, 2)

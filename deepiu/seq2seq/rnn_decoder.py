@@ -391,10 +391,12 @@ class RnnDecoder(Decoder):
         initial_state = tf.concat([initial_state, inital_attention], 1, name="initial_attention_state")
         state_size += self.cell.output_size
 
+      tf.add_to_collection('beam_search_beam_size', tf.constant(beam_size))
       tf.add_to_collection('beam_search_initial_state', initial_state)
       tf.add_to_collection('beam_search_initial_logprobs', initial_logprobs)
       tf.add_to_collection('beam_search_initial_ids', initial_ids)
-      tf.add_to_collection('beam_search_beam_size', tf.constant(beam_size))
+      if attention_states is not None:
+        tf.add_to_collection('beam_search_initial_alignments', tf.get_collection('attention_alignments')[-1])
 
       input_feed = tf.placeholder(dtype=tf.int64, 
                                   shape=[None],  # batch_size

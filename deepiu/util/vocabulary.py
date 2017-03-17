@@ -62,10 +62,12 @@ def go_id():
   return vocab.id('<GO>') 
   #return NUM_RESERVED_IDS - 1
   
-def init():
+def init(vocab_path=None):
   global vocab, vocab_size
+  if vocab_path is None:
+    vocab_path = FLAGS.vocab
   if vocab is None:
-    logging.info('vocab:{}'.format(FLAGS.vocab))
+    logging.info('vocab:{}'.format(vocab_path))
     logging.info('NUM_RESERVED_IDS:{}'.format(NUM_RESERVED_IDS))
     vocab = Vocabulary(FLAGS.vocab, NUM_RESERVED_IDS)
     vocab_size = vocab.size() if not FLAGS.vocab_size else min(vocab.size(), FLAGS.vocab_size)

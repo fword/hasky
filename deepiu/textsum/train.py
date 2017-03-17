@@ -190,6 +190,8 @@ def gen_predict_graph(predictor):
   tf.add_to_collection('beam_text_score', beam_text_score)          
 
   init_predict_text(decode_method=SeqDecodeMethod.beam_search)
+  if FLAGS.use_attention:
+    tf.add_to_collection('beam_search_alignments', tf.get_collection('attention_alignments')[-1])
 
   return beam_text, beam_text_score
 

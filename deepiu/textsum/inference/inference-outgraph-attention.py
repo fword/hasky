@@ -48,11 +48,15 @@ def predict(predictor, input_text):
   print(text2ids.ids2text(word_ids))
 
   timer = gezi.Timer()
+  
+  #print(tf.get_collection('beam_search_initial_alignments'))
+  #print(tf.get_collection('beam_search_alignments'))
   init_states = predictor.inference([
                                         'beam_search_beam_size',
                                         'beam_search_initial_state', 
                                         'beam_search_initial_ids', 
                                         'beam_search_initial_logprobs',
+                                        'beam_search_initial_alignments' #or attention_alignments
                                         ], 
                                         feed_dict= {
                                           tf.get_collection('input_text_feed')[0] : [word_ids]
@@ -61,7 +65,9 @@ def predict(predictor, input_text):
   step_func = lambda input_feed, state_feed : predictor.inference([
                                         'beam_search_state', 
                                         'beam_search_ids', 
-                                        'beam_search_logprobs'
+                                        'beam_search_logprobs',
+                                        #'attention_alignments'
+                                        'beam_search_alignments', #must use this
                                         ], 
                                         feed_dict= {
                                           #TODO...attetion still need input_text feed, see rnn_decoder.py  beam_search_step
@@ -81,6 +87,7 @@ def predict(predictor, input_text):
 
   for i, beam in enumerate(beams):
     print(i, beam.words, text2ids.ids2text(beam.words), math.exp(beam.logprob), beam.logprob, beam.score, beam.logprobs)
+    print(beam.alignments_list)
 
   print('beam search using time(ms):', timer.elapsed_ms())
 

@@ -6,6 +6,9 @@
 #   \Description  
 # ==============================================================================
 
+"""
+This is used for train predict, predictor building graph not read from meta
+"""
   
 from __future__ import absolute_import
 from __future__ import division
@@ -13,6 +16,16 @@ from __future__ import print_function
 
 import tensorflow as tf
 import melt
+
+def get_tensor_from_key(key, index=-1):
+  if isinstance(key, str):
+    try:
+      return tf.get_collection(key)[index]
+    except Exception:
+      print('Warning:', key, ' not find in graph')
+      return tf.no_op()
+  else:
+    return key
 
 class PredictorBase(object):
   def __init__(self, sess=None):
@@ -49,3 +62,18 @@ class PredictorBase(object):
     self.restore_from_graph()
     saver.restore(self.sess, model_path)
     return self.sess
+
+  def run(self, key, feed_dict=None):
+    return self.sess.run(key, feed_dict)
+
+  def inference(self, key, feed_dict=None, index=-1):
+    if not isinstance(key, (list, tuple)):
+      return self.sess.run(get_tensor_from_key(key, index), feed_dict=feed_dict)
+    else:
+      keys = key 
+      if not isinstance(index, (list, tuple)):
+        indexes = [index] * len(keys)
+      else:
+        indexes = index 
+      keys = [get_tensor_from_key(key, index) for key,index in zip(keys, indexes)]
+      return self.sess.run(keys, feed_dict=feed_dict)

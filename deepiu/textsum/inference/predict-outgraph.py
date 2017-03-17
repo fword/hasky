@@ -16,16 +16,20 @@ import tensorflow as tf
 flags = tf.app.flags
 FLAGS = flags.FLAGS
 
-#flags.DEFINE_string('model_dir', '/home/gezi/temp/textsum/model.seq2seq.attention/', '')
-flags.DEFINE_string('model_dir', '/home/gezi/temp/textsum/model.seq2seq/', '')
+  
+flags.DEFINE_string('model_dir', '/home/gezi/temp/textsum/model.seq2seq.attention/', '')
+
+flags.DEFINE_string('algo', 'seq2seq', 'default algo is bow(cbow), also support rnn, show_and_tell, TODO cnn')
+
 flags.DEFINE_string('vocab', '/home/gezi/temp/textsum/tfrecord/seq-basic.10w/train/vocab.txt', 'vocabulary file')
-#flags.DEFINE_integer('decode_max_words', 10, 'if 0 use TEXT_MAX_WORDS from conf.py otherwise use decode_max_words')
 
 import sys, os, math
 import gezi, melt
 import numpy as np
 
 from deepiu.util import text2ids
+from deepiu.image_caption.algos import algos_factory
+from deepiu.seq2seq.rnn_decoder import SeqDecodeMethod
 
 import conf  
 from conf import TEXT_MAX_WORDS, INPUT_TEXT_MAX_WORDS, NUM_RESERVED_IDS, ENCODE_UNK
@@ -53,6 +57,7 @@ def predict(predictor, input_text):
                                         'beam_search_initial_state', 
                                         'beam_search_initial_ids', 
                                         'beam_search_initial_logprobs',
+                                        'beam_search_initial_alignments',
                                         ], 
                                         feed_dict= {
                                           tf.get_collection('input_text_feed')[0] : [word_ids]
@@ -61,7 +66,8 @@ def predict(predictor, input_text):
   step_func = lambda input_feed, state_feed : predictor.inference([
                                         'beam_search_state', 
                                         'beam_search_ids', 
-                                        'beam_search_logprobs'
+                                        'beam_search_logprobs',
+                                        'attention_alignments', #optional
                                         ], 
                                         feed_dict= {
                                           #TODO...attetion still need input_text feed, see rnn_decoder.py  beam_search_step
@@ -81,15 +87,27 @@ def predict(predictor, input_text):
 
   for i, beam in enumerate(beams):
     print(i, beam.words, text2ids.ids2text(beam.words), math.exp(beam.logprob), beam.logprob, beam.score, beam.logprobs)
+    print(beam.alignments_list)
 
   print('beam search using time(ms):', timer.elapsed_ms())
 
 
-
 def main(_):
   text2ids.init()
-  predictor = melt.Predictor(FLAGS.model_dir)
-  
+
+  global_scope = ''
+  if FLAGS.add_global_scope:
+    global_scope = FLAGS.global_scope if FLAGS.global_scope else FLAGS.algo
+ 
+  with tf.variable_scope(global_scope):
+    predictor =  algos_factory.gen_predictor(FLAGS.algo)
+    with tf.variable_scope(FLAGS.main_scope) as scope:
+      beam_text, beam_score = predictor.init_predict_text(decode_method=SeqDecodeMethod.beam_search, 
+                                                          beam_size=FLAGS.beam_size,
+                                                          convert_unk=False)  
+
+  predictor.load(FLAGS.model_dir) 
+
   predict(predictor, "宝宝太胖怎么办呢")
   predict(predictor, "包邮买二送一性感女内裤低腰诱惑透视蕾丝露臀大蝴蝶三角内裤女夏-淘宝网")
   predict(predictor, "大棚辣椒果实变小怎么办,大棚辣椒果实变小防治措施")
