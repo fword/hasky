@@ -2,6 +2,12 @@
 mainly tf work, may do some pytorch related    
 <div align="center">
   <img src="http://images2015.cnblogs.com/blog/61573/201703/61573-20170318205837260-872722304.png"><br><br>
+</div>  
+<div align="center">
+  <img src="http://images2015.cnblogs.com/blog/61573/201703/61573-20170318205836604-2137010595.png"><br><br>
+</div>      
+<div align="center">
+  <img src="http://images2015.cnblogs.com/blog/61573/201703/61573-20170318205836604-2137010595.png"><br><br>
 </div>    
 ## incase not find dependence, make sure set PYTHONPATH to include hasky/util so we can find gezi and melt
 ##./applications/ 
